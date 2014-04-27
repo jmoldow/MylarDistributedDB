@@ -1,2 +1,26 @@
+# Meteor
 .meteor/local
 .meteor/meteorite
+
+# Tex output files
+*.aux
+*.ps
+*.dvi
+*.bbl
+*.blg
+*.tmp
+*.log
+*.out
+*.lot
+*.lof
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Other
+*~
+.*~
+*.sw*
+.*.sw*
+
