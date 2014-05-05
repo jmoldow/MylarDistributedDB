@@ -18,6 +18,9 @@
 *.fls
 *.fdb_latexmk
 
+# libs
+*.so
+
 # Other
 *~
 .*~
