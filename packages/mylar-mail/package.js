@@ -9,6 +9,7 @@ Package.describe({
 Npm.depends({sockjs: "0.3.8", "faye-websocket": "0.7.2"});
 
 Package.on_use(function (api) {
+  api.use('livedata', ['client', 'server']);
   api.use(['check', 'random', 'ejson', 'json', 'underscore', 'deps',
            'logging', 'retry'],
           ['client', 'server']);
