@@ -21,9 +21,11 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
   return
 }
 
-
-type Op struct {
-}
+/*
+****************************************************
+Data Types
+****************************************************
+*/
 
 type MMDatabase struct {
   mu sync.Mutex
@@ -31,8 +33,154 @@ type MMDatabase struct {
   me int
   dead bool // for testing
   unreliable bool // for testing
+  servers []string
+  nServers int
+  nReplicas int // Number of replicas wanted
 }
 
+type Message struct {
+  isHandoff bool
+  handoffDestination string
+  timestamp = time.Time // Timestamp at which the coordinator first got the request
+}
+
+/*
+****************************************************
+API from Mylar/Meteor
+****************************************************
+*/
+
+// Returns an ordered slice of peers in order they should be considered as coordinator
+func (db *MMDatabase) GetCoordinatorList(username string) []string {
+  initialIndex := getCoordinatorIndex(username)
+  output := make([]string, 0)
+  
+  for i := initialIndex; i < len(db.peers); i++ {
+    append(output, db.peers[i])
+  }
+  
+  for i := 0; i < initialIndex; i++ {
+    append(output, db.peers[i])
+  }
+  
+  return output
+}
+
+// Returns success once nReplicas replicas are stored in the system
+func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Message) Err {
+  // Assert that this should be coordinator
+  if db.getCoordinatorIndex(username) != db.me && !message.isHandoff {
+    return ErrWrongCoordinator
+  }
+  
+  message.timestamp = time.Now()
+  totalReplicas := 0
+  replicaLocations := make(map[int]bool)
+  handoffTargets := make(map[int]bool)
+  
+  db.LocalPut(username, message)
+  totalReplicas++
+  replicaLocations[db.me] = true
+  
+  for totalReplicas < db.nReplicas {
+    for i, server := db.GetCoordinatorList(username) {
+      if !replicaLocations[i] {
+        // Set Hinted Handoff
+        handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
+        if handoffTarget == -1 {
+          // TODO: Set Handoff Nil
+        } else {
+          // TODO: Set Handoff to target
+          handoffTargets[handoffTarget] = true
+        }
+        // TODO: Define args and reply
+        ok := call(server, "MMDatabase.ReplicaPut", args, reply)
+      
+        if ok {
+          if reply.Err == OK {
+            totalReplicas++
+            replicaLocations[i] = true
+          }
+        }
+      }
+      
+      if totalReplicas >=  db.nReplicas {
+        break
+      }
+      
+    }
+  }
+  
+  // There should now be (at least) nReplicas replicas in the system
+
+  
+  return OK
+}
+
+/*
+****************************************************
+API to Mylar/Meteor
+****************************************************
+*/
+
+/*
+****************************************************
+API to Peers
+****************************************************
+*/
+
+/*
+****************************************************
+API Helpers
+****************************************************
+*/
+
+// Returns index of first peer that should be chosen as coordinator
+func (db *MMDatabase) getCoordinatorIndex(username string) int {
+  return hash(username) % db.nPeers
+}
+
+// Returns what the current handoff target should be with respect to replicaLocations
+// Returns -1 if no handoff
+// Assumes currentIndex is in range [0,nReplicas-1]
+func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replicaLocations map[int]bool, handoffTargets map[int]bool) int {
+  wrap := false
+  firstReplica := db.getCoordinatorIndex(username)
+  lastReplica := firstReplica + db.nReplicas
+  if lastReplica >= db.nServers {
+    wrap = true
+    db.lastReplica = db.lastReplica % db.nServers
+  }
+  
+  // Return -1 if in proper range
+  if wrap {
+    if currentIndex >= firstReplica || currentIndex <= lastReplica {
+      return -1
+    }
+  } else {
+    if firstReplica <= currentIndex && currentIndex <= lastReplica {
+      return -1
+    }
+  }
+  
+  // Otherwise, target first one on priority list with no replica or targeted handoff yet
+  i := firstReplica
+  for {
+    if !replicaLocations[i] && !handoffTargets[i] {
+      return i
+    }
+    i++
+    if i >= db.nServers {
+      i = i % db.nServers
+    }
+  }
+}
+
+/*
+****************************************************
+Start and Kill Code
+****************************************************
+*/
 
 // tell the server to shut itself down.
 func (db *MMDatabase) kill() {
@@ -54,6 +202,9 @@ func StartServer(servers []string, me int) *MMDatabase {
 
   db := new(MMDatabase)
   db.me = me
+  db.servers = servers
+  db.nServers = len(servers)
+  db.nReplicas = 3
 
   // Your initialization code here.
 
@@ -102,4 +253,3 @@ func StartServer(servers []string, me int) *MMDatabase {
 
   return db
 }
-
