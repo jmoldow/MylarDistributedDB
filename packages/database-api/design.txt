@@ -1,0 +1,16 @@
+Database Readme:
+
+API:
+
+getCoordinator(uname)
+return: Ordered priority list of replicas to contact
+
+coordinatorPut(uname, id, collection, doc)
+- Set timestamp, HintedHandoff
+- Call replicaPut for other replicas
+- Call localPut
+- return success once enough successful replicaPuts
+
+replicaPut(uname, id, collection, doc)
+- Call localPut
+- return success
