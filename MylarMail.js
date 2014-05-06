@@ -1,3 +1,8 @@
+MYLAR_ACTIVE_ATTACKER = true;
+// use IDP only if active attacker
+Accounts.config({sendVerificationEmail:active_attacker(),
+                 loginExpirationInDays:1});
+
 if (Meteor.isClient) {
   Template.hello.greeting = function () {
     return "Welcome to MylarMail.";
