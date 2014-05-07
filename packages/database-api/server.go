@@ -36,11 +36,14 @@ type MMDatabase struct {
   servers []string
   nServers int
   nReplicas int // Number of replicas wanted
+  handoffMessages []*Message // Messages that need to be handed off
 }
 
 type Message struct {
+  id MessageID
   isHandoff bool
   handoffDestination string
+  handoffUsername string
   timestamp = time.Time // Timestamp at which the coordinator first got the request
 }
 
@@ -88,19 +91,25 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
         // Set Hinted Handoff
         handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
         if handoffTarget == -1 {
-          // TODO: Set Handoff Nil
+          message.isHandoff = false
         } else {
-          // TODO: Set Handoff to target
+          message.isHandoff = true
+          message.handoffDestination = db.servers[i]
+          message.handoffUsername = username
           handoffTargets[handoffTarget] = true
         }
-        // TODO: Define args and reply
+        // Set up args and reply
+        args := new(ReplicaPutArgs)
+        reply := new(ReplicaPutReply)
+        args.Username = username
+        args.Msg = message
+        args.Handoff = false
+        
         ok := call(server, "MMDatabase.ReplicaPut", args, reply)
       
-        if ok {
-          if reply.Err == OK {
-            totalReplicas++
-            replicaLocations[i] = true
-          }
+        if ok && reply.Err == OK {
+          totalReplicas++
+          replicaLocations[i] = true
         }
       }
       
@@ -112,7 +121,6 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
   }
   
   // There should now be (at least) nReplicas replicas in the system
-
   
   return OK
 }
@@ -123,17 +131,79 @@ API to Mylar/Meteor
 ****************************************************
 */
 
+func (db *MMDatabase) LocalPut(username string, msg Message) Err {
+  // TODO
+  return OK
+}
+
+func (db *MMDatabase) LocalDelete(username string, id MessageID) Err {
+  // TODO
+  return OK
+}
+
 /*
 ****************************************************
 API to Peers
 ****************************************************
 */
 
+func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) error {
+  message = args.Msg
+  // if message is satisfying a handoff, mark it as not needing handoff
+  if args.Handoff {
+    message.isHandoff = false
+  }
+  
+  // Do Local Put
+  db.LocalPut(args.Username, message)
+  
+  // if message needs to be handed off, store in list of messages that need handing off
+  if message.isHandoff {
+    append(db.handoffMessages, &message)
+  }
+  reply.Err = OK
+  return nil
+}
+
 /*
 ****************************************************
 API Helpers
 ****************************************************
 */
+
+// Returns a copy of slice without message at index
+func removeMessage(slice []*Message, index int) []*Message {
+  maxIndex := len(slice)-1
+  
+  lastElem := slice[maxIndex]
+  slice[maxIndex] = slice[index]
+  slice[index] = lastElem
+  
+  return slice[:maxIndex]
+}
+
+func (db *MMDatabase) runHandoffLoop() {
+  for !db.dead {
+    for i, message := range db.handoffMessages {
+      // Set up args and reply
+      args := new(ReplicaPutArgs)
+      reply := new(ReplicaPutReply)
+      args.Username = message.handoffUsername
+      args.Msg = message
+      args.Handoff = true
+        
+      ok := call(server, "MMDatabase.ReplicaPut", args, reply)
+      
+      if ok && reply.Err == OK {
+        // Handoff successful, delete message
+        db.handoffMessages = removeMessage(db.handoffMessages, i)
+        break
+      } else {
+        time.Sleep(1000*time.Millisecond)
+      }
+    }
+  }
+}
 
 // Returns index of first peer that should be chosen as coordinator
 func (db *MMDatabase) getCoordinatorIndex(username string) int {
@@ -205,8 +275,9 @@ func StartServer(servers []string, me int) *MMDatabase {
   db.servers = servers
   db.nServers = len(servers)
   db.nReplicas = 3
+  db.handoffMessages = make([]*Message, 0)
 
-  // Your initialization code here.
+  go db.runHandoffLoop()
 
   rpcs := rpc.NewServer()
   rpcs.Register(db)

@@ -8,17 +8,23 @@ const (
 )
 type Err string
 
-type Args struct {
-
+type ReplicaPutArgs struct {
+  Username string
+  Msg Message
+  Handoff bool
 }
 
-type Reply struct {
+type ReplicaPutReply struct {
   Err Err
 }
 
 type RequestID struct {
   ClientID int64
   Seq int64
+}
+
+type MessageID struct {
+  // TODO
 }
 
 type sameID(id1 RequestID, id2 RequestID) bool {
