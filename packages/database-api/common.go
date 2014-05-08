@@ -27,7 +27,7 @@ type MessageID struct {
   // TODO
 }
 
-type sameID(id1 RequestID, id2 RequestID) bool {
+func sameID(id1 RequestID, id2 RequestID) bool {
   return id1.ClientID == id2.ClientID && id1.Seq == id2.Seq
 }
 

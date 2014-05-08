@@ -7,9 +7,7 @@ import "log"
 import "sync"
 import "os"
 import "syscall"
-import "encoding/gob"
 import "math/rand"
-import "strconv"
 import "time"
 
 const Debug=0
@@ -54,17 +52,17 @@ API from Mylar/Meteor
 ****************************************************
 */
 
-// Returns an ordered slice of peers in order they should be considered as coordinator
+// Returns an ordered slice of servers in order they should be considered as coordinator
 func (db *MMDatabase) GetCoordinatorList(username string) []string {
-  initialIndex := getCoordinatorIndex(username)
+  initialIndex := db.getCoordinatorIndex(username)
   output := make([]string, 0)
   
   for i := initialIndex; i < len(db.servers); i++ {
-    append(output, db.servers[i])
+    output = append(output, db.servers[i])
   }
   
   for i := 0; i < initialIndex; i++ {
-    append(output, db.servers[i])
+    output = append(output, db.servers[i])
   }
   
   return output
@@ -81,13 +79,10 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
   replicaLocations := make(map[int]bool)
   handoffTargets := make(map[int]bool)
   
-  db.LocalPut(username, message)
-  totalReplicas++
-  replicaLocations[db.me] = true
-  
-  for totalReplicas < db.nReplicas {
-    for i, server := db.GetCoordinatorList(username) {
-      if !replicaLocations[i] {
+  // Send to all N replicas except for this one (the coordinator)
+  for totalReplicas < db.nReplicas-1 {
+    for i, server := range(db.GetCoordinatorList(username)) {
+      if !replicaLocations[i] && i != db.me {
         // Set Hinted Handoff
         handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
         if handoffTarget == -1 {
@@ -120,7 +115,12 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
     }
   }
   
-  // There should now be (at least) nReplicas replicas in the system
+  // There should now be (at least) nReplicas-1 replicas in the system.
+  // Replicate at the N-th server (this one / the coordinator),
+  // then return success.
+  db.LocalPut(username, message)
+  totalReplicas++
+  replicaLocations[db.me] = true
   
   return OK
 }
@@ -143,12 +143,12 @@ func (db *MMDatabase) LocalDelete(username string, id MessageID) Err {
 
 /*
 ****************************************************
-API to Peers
+API to Servers
 ****************************************************
 */
 
 func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) error {
-  message = args.Msg
+  message := args.Msg
   // if message is satisfying a handoff, mark it as not needing handoff
   if args.Handoff {
     message.isHandoff = false
@@ -159,7 +159,7 @@ func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) e
   
   // if message needs to be handed off, store in list of messages that need handing off
   if message.isHandoff {
-    append(db.handoffMessages, &message)
+    db.handoffMessages = append(db.handoffMessages, &message)
   }
   reply.Err = OK
   return nil
@@ -189,10 +189,10 @@ func (db *MMDatabase) runHandoffLoop() {
       args := new(ReplicaPutArgs)
       reply := new(ReplicaPutReply)
       args.Username = message.handoffUsername
-      args.Msg = message
+      args.Msg = *message
       args.Handoff = true
         
-      ok := call(server, "MMDatabase.ReplicaPut", args, reply)
+      ok := call(message.handoffDestination, "MMDatabase.ReplicaPut", args, reply)
       
       if ok && reply.Err == OK {
         // Handoff successful, delete message
@@ -205,9 +205,9 @@ func (db *MMDatabase) runHandoffLoop() {
   }
 }
 
-// Returns index of first peer that should be chosen as coordinator
+// Returns index of first server that should be chosen as coordinator
 func (db *MMDatabase) getCoordinatorIndex(username string) int {
-  return hash(username) % db.nPeers
+  return int(hash(username) % uint32(db.nServers))
 }
 
 // Returns what the current handoff target should be with respect to replicaLocations
@@ -219,7 +219,7 @@ func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replic
   lastReplica := firstReplica + db.nReplicas
   if lastReplica >= db.nServers {
     wrap = true
-    db.lastReplica = db.lastReplica % db.nServers
+    lastReplica = lastReplica % db.nServers
   }
   
   // Return -1 if in proper range
@@ -304,9 +304,9 @@ func (db *MMDatabase) kill() {
 func StartServer(servers []string, me int) *MMDatabase {
   // call gob.Register on structures you want
   // Go's RPC library to marshall/unmarshall.
-  gob.Register(Op{})
 
   db := new(MMDatabase)
+  db.dead = false
   db.me = me
   db.servers = servers
   db.nServers = len(servers)
