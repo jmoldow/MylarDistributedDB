@@ -44,7 +44,8 @@ type Message struct {
   isHandoff bool
   handoffDestination string
   handoffUsername string
-  timestamp = time.Time // Timestamp at which the coordinator first got the request
+  data string
+  collection string
 }
 
 /*
@@ -58,12 +59,12 @@ func (db *MMDatabase) GetCoordinatorList(username string) []string {
   initialIndex := getCoordinatorIndex(username)
   output := make([]string, 0)
   
-  for i := initialIndex; i < len(db.peers); i++ {
-    append(output, db.peers[i])
+  for i := initialIndex; i < len(db.servers); i++ {
+    append(output, db.servers[i])
   }
   
   for i := 0; i < initialIndex; i++ {
-    append(output, db.peers[i])
+    append(output, db.servers[i])
   }
   
   return output
@@ -76,7 +77,6 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
     return ErrWrongCoordinator
   }
   
-  message.timestamp = time.Now()
   totalReplicas := 0
   replicaLocations := make(map[int]bool)
   handoffTargets := make(map[int]bool)
@@ -248,6 +248,42 @@ func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replic
 
 /*
 ****************************************************
+API Dispatch Methods
+****************************************************
+*/
+
+// Serves RPC calls from other database instances
+func serveRPC() {
+  for db.dead == false {
+    conn, err := db.l.Accept()
+    if err == nil && db.dead == false {
+      if db.unreliable && (rand.Int63() % 1000) < 100 {
+        // discard the request.
+        conn.Close()
+      } else if db.unreliable && (rand.Int63() % 1000) < 200 {
+        // process the request but force discard of reply.
+        c1 := conn.(*net.UnixConn)
+        f, _ := c1.File()
+        err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
+        if err != nil {
+          fmt.Printf("shutdown: %v\n", err)
+        }
+        go rpcs.ServeConn(conn)
+      } else {
+        go rpcs.ServeConn(conn)
+      }
+    } else if err == nil {
+      conn.Close()
+    }
+    if err != nil && db.dead == false {
+      fmt.Printf("MMDatabase(%v) accept: %v\n", me, err.Error())
+      db.kill()
+    }
+  }
+}
+
+/*
+****************************************************
 Start and Kill Code
 ****************************************************
 */
@@ -293,34 +329,7 @@ func StartServer(servers []string, me int) *MMDatabase {
   // please do not change any of the following code,
   // or do anything to subvert it.
 
-  go func() {
-    for db.dead == false {
-      conn, err := db.l.Accept()
-      if err == nil && db.dead == false {
-        if db.unreliable && (rand.Int63() % 1000) < 100 {
-          // discard the request.
-          conn.Close()
-        } else if db.unreliable && (rand.Int63() % 1000) < 200 {
-          // process the request but force discard of reply.
-          c1 := conn.(*net.UnixConn)
-          f, _ := c1.File()
-          err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
-          if err != nil {
-            fmt.Printf("shutdown: %v\n", err)
-          }
-          go rpcs.ServeConn(conn)
-        } else {
-          go rpcs.ServeConn(conn)
-        }
-      } else if err == nil {
-        conn.Close()
-      }
-      if err != nil && db.dead == false {
-        fmt.Printf("MMDatabase(%v) accept: %v\n", me, err.Error())
-        db.kill()
-      }
-    }
-  }()
+  go serveRPC()
 
   return db
 }
