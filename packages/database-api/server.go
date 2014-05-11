@@ -44,16 +44,17 @@ type MMDatabase struct {
   nServers int
   nReplicas int // Number of replicas wanted
   handoffMessages []*Message // Messages that need to be handed off
+  rpcCount int
 }
 
 type Message struct {
-  id MessageID
+  Id MessageID
   // Whether or not this message needs to be handed off to another node later
-  isHandoff bool
-  handoffDestination string
-  handoffUsername string
-  data string
-  collection string
+  IsHandoff bool
+  HandoffDestination string
+  HandoffUsername string
+  Data string
+  Collection string
 }
 
 /*
@@ -64,7 +65,7 @@ API from Mylar/Meteor
 
 // Returns an ordered slice of servers in order they should be considered as coordinator
 func (db *MMDatabase) GetCoordinatorList(username string) []string {
-  initialIndex := db.getCoordinatorIndex(username)
+  initialIndex := db.GetCoordinatorIndex(username)
   output := make([]string, 0)
   
   for i := initialIndex; i < len(db.servers); i++ {
@@ -81,7 +82,7 @@ func (db *MMDatabase) GetCoordinatorList(username string) []string {
 // Returns success once nReplicas replicas are stored in the system
 func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Message) Err {
   // Assert that this should be coordinator
-  if db.getCoordinatorIndex(username) != db.me && !message.isHandoff {
+  if db.GetCoordinatorIndex(username) != db.me && !message.IsHandoff {
     return ErrWrongCoordinator
   }
   
@@ -94,13 +95,13 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
     for i, server := range(db.GetCoordinatorList(username)) {
       if !replicaLocations[i] && i != db.me {
         // Set Hinted Handoff
-        handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
+        handoffTarget := db.GetHandoffTarget(username, i, replicaLocations, handoffTargets)
         if handoffTarget == -1 {
-          message.isHandoff = false
+          message.IsHandoff = false
         } else {
-          message.isHandoff = true
-          message.handoffDestination = db.servers[i]
-          message.handoffUsername = username
+          message.IsHandoff = true
+          message.HandoffDestination = db.servers[i]
+          message.HandoffUsername = username
           handoffTargets[handoffTarget] = true
         }
         // Set up args and reply
@@ -175,14 +176,14 @@ func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) e
   message := args.Msg
   // if message is satisfying a handoff, mark it as not needing handoff
   if args.Handoff {
-    message.isHandoff = false
+    message.IsHandoff = false
   }
   
   // Do Local Put
   db.LocalPut(args.Username, message)
   
   // if message needs to be handed off, store in list of messages that need handing off
-  if message.isHandoff {
+  if message.IsHandoff {
     db.handoffMessages = append(db.handoffMessages, &message)
   }
   reply.Err = OK
@@ -196,7 +197,7 @@ API Helpers
 */
 
 // Returns a copy of slice without message at index
-func removeMessage(slice []*Message, index int) []*Message {
+func RemoveMessage(slice []*Message, index int) []*Message {
   maxIndex := len(slice)-1
   
   lastElem := slice[maxIndex]
@@ -206,40 +207,42 @@ func removeMessage(slice []*Message, index int) []*Message {
   return slice[:maxIndex]
 }
 
-func (db *MMDatabase) runHandoffLoop() {
+func (db *MMDatabase) RunHandoffLoop() {
   for !db.dead {
+    fmt.Printf("RunHandoffLoop %s\n", db.servers[db.me])
     for i, message := range db.handoffMessages {
       // Set up args and reply
       args := new(ReplicaPutArgs)
       reply := new(ReplicaPutReply)
-      args.Username = message.handoffUsername
+      args.Username = message.HandoffUsername
       args.Msg = *message
       args.Handoff = true
         
-      ok := call(message.handoffDestination, "MMDatabase.ReplicaPut", args, reply)
+      ok := call(message.HandoffDestination, "MMDatabase.ReplicaPut", args, reply)
       
       if ok && reply.Err == OK {
         // Handoff successful, delete message
-        db.handoffMessages = removeMessage(db.handoffMessages, i)
+        db.handoffMessages = RemoveMessage(db.handoffMessages, i)
         break
       } else {
         time.Sleep(1000*time.Millisecond)
       }
     }
+    time.Sleep(1000*time.Millisecond)
   }
 }
 
 // Returns index of first server that should be chosen as coordinator
-func (db *MMDatabase) getCoordinatorIndex(username string) int {
-  return int(hash(username) % uint32(db.nServers))
+func (db *MMDatabase) GetCoordinatorIndex(username string) int {
+  return int(Hash(username) % uint32(db.nServers))
 }
 
 // Returns what the current handoff target should be with respect to replicaLocations
 // Returns -1 if no handoff
 // Assumes currentIndex is in range [0,nReplicas-1]
-func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replicaLocations map[int]bool, handoffTargets map[int]bool) int {
+func (db *MMDatabase) GetHandoffTarget(username string, currentIndex int, replicaLocations map[int]bool, handoffTargets map[int]bool) int {
   wrap := false
-  firstReplica := db.getCoordinatorIndex(username)
+  firstReplica := db.GetCoordinatorIndex(username)
   lastReplica := firstReplica + db.nReplicas
   if lastReplica >= db.nServers {
     wrap = true
@@ -272,64 +275,32 @@ func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replic
 
 /*
 ****************************************************
-API Dispatch Methods
-****************************************************
-*/
-
-// Serves RPC calls from other database instances
-func (db *MMDatabase) serveRPC(rpcs *rpc.Server) {
-  for db.dead == false {
-    conn, err := db.l.Accept()
-    if err == nil && db.dead == false {
-      if db.unreliable && (rand.Int63() % 1000) < 100 {
-        // discard the request.
-        conn.Close()
-      } else if db.unreliable && (rand.Int63() % 1000) < 200 {
-        // process the request but force discard of reply.
-        c1 := conn.(*net.UnixConn)
-        f, _ := c1.File()
-        err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
-        if err != nil {
-          fmt.Printf("shutdown: %v\n", err)
-        }
-        go rpcs.ServeConn(conn)
-      } else {
-        go rpcs.ServeConn(conn)
-      }
-    } else if err == nil {
-      conn.Close()
-    }
-    if err != nil && db.dead == false {
-      fmt.Printf("MMDatabase(%v) accept: %v\n", db.me, err.Error())
-      db.kill()
-    }
-  }
-}
-
-/*
-****************************************************
 Helper Functions
 ****************************************************
 */
 
-func sameID(id1 RequestID, id2 RequestID) bool {
+func SameID(id1 RequestID, id2 RequestID) bool {
   return id1.ClientID == id2.ClientID && id1.Seq == id2.Seq
 }
 
-func hash(s string) uint32 {
+func Hash(s string) uint32 {
   h := fnv.New32a()
   h.Write([]byte(s))
   return h.Sum32()
 }
 
-func nrand() int64 {
+func Nrand() int64 {
+  fmt.Println("nrand 0")
   max := big.NewInt(int64(1) << 62)
+  fmt.Println("nrand 1")
   bigx, _ := cryptoRand.Int(cryptoRand.Reader, max)
+  fmt.Println("nrand 2")
   x := bigx.Int64()
+  fmt.Println("nrand 3")
   return x
 }
 
-func port(tag string, host int) string {
+func Port(tag string, host int) string {
   s := "/var/tmp/824-"
   s += strconv.Itoa(os.Getuid()) + "/"
   os.Mkdir(s, 0777)
@@ -337,13 +308,14 @@ func port(tag string, host int) string {
   s += strconv.Itoa(os.Getpid()) + "-"
   s += tag + "-"
   s += strconv.Itoa(host)
+  fmt.Println(s)
   return s
 }
 
-func cleanup(servers []*MMDatabase) {
+func Cleanup(servers []*MMDatabase) {
   for i := 0; i < len(servers); i++ {
     if servers[i] != nil {
-      servers[i].kill()
+      servers[i].Kill()
     }
   }
 }
@@ -356,28 +328,46 @@ func cleanup(servers []*MMDatabase) {
 //
 // the return value is true if the server responded, and false
 // if call() was not able to contact the server. in particular,
-// the reply's contents are only valid if call() returned true.
+// the replys contents are only valid if call() returned true.
 //
 // you should assume that call() will time out and return an
-// error after a while if it doesn't get a reply from the server.
+// error after a while if it does not get a reply from the server.
 //
 // please use call() to send all RPCs, in client.go and server.go.
-// please don't change this function.
+// please do not change this function.
 //
-func call(srv string, rpcname string,
-          args interface{}, reply interface{}) bool {
-  c, errx := rpc.Dial("unix", srv)
-  if errx != nil {
+func call(srv string, name string, args interface{}, reply interface{}) bool {
+  fmt.Println("call")
+  fmt.Println(srv)
+  fmt.Println(name)
+  fmt.Printf("args(%v)\n", args)
+  fmt.Printf("reply(%v)\n", reply)
+  c, err := rpc.Dial("unix", srv)
+  fmt.Println("call 1")
+  if err != nil {
+    fmt.Println("call 2")
+    err1 := err.(*net.OpError)
+    fmt.Println("call 3")
+    if err1.Err != syscall.ENOENT && err1.Err != syscall.ECONNREFUSED {
+      fmt.Printf("paxos Dial() failed: %v\n", err1)
+    }
+    fmt.Println("call 4")
     return false
   }
+  fmt.Println("call 5")
   defer c.Close()
-  
-  err := c.Call(rpcname, args, reply)
+  fmt.Println("call 6")
+    
+  err = c.Call(name, args, reply)
+  fmt.Println("call 7")
   if err == nil {
+    fmt.Println("call 8")
     return true
   }
 
+  fmt.Println("call 9")
   fmt.Println(err)
+  fmt.Println("call 10")
   return false
 }
 
@@ -423,7 +413,7 @@ Start and Kill Code
 */
 
 // tell the server to shut itself down.
-func (db *MMDatabase) kill() {
+func (db *MMDatabase) Kill() {
   DPrintf("Kill(%d): die\n", db.me)
   db.dead = true
   db.l.Close()
@@ -435,9 +425,10 @@ func (db *MMDatabase) kill() {
 // form the fault-tolerant key/value service.
 // me is the index of the current server in servers[].
 // 
-func StartServer(servers []string, me int) *MMDatabase {
+func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
   // call gob.Register on structures you want
   // Go's RPC library to marshall/unmarshall.
+  gob.Register(Message{})
   gob.Register(GetCoordListArgs{})
   gob.Register(GetCoordListReply{})
 
@@ -449,23 +440,56 @@ func StartServer(servers []string, me int) *MMDatabase {
   db.nReplicas = 3
   db.handoffMessages = make([]*Message, 0)
 
-  go db.runHandoffLoop()
+  if rpcs != nil {
+    // caller will create socket &c
+    rpcs.Register(db)
+  } else {
+    rpcs = rpc.NewServer()
+    rpcs.Register(db)
 
-  rpcs := rpc.NewServer()
-  rpcs.Register(db)
+    go db.RunHandoffLoop()
 
-  os.Remove(servers[me])
-  l, e := net.Listen("unix", servers[me]);
-  if e != nil {
-    log.Fatal("listen error: ", e);
+    os.Remove(servers[me])
+    l, e := net.Listen("unix", servers[me]);
+    if e != nil {
+      log.Fatal("listen error: ", e);
+    }
+    db.l = l
+    
+    // please do not change any of the following code,
+    // or do anything to subvert it.
+    
+    // create a thread to accept RPC connections
+    go func() {
+      for db.dead == false {
+        conn, err := db.l.Accept()
+        if err == nil && db.dead == false {
+          if db.unreliable && (rand.Int63() % 1000) < 100 {
+            // discard the request.
+            conn.Close()
+          } else if db.unreliable && (rand.Int63() % 1000) < 200 {
+            // process the request but force discard of reply.
+            c1 := conn.(*net.UnixConn)
+            f, _ := c1.File()
+            err := syscall.Shutdown(int(f.Fd()), syscall.SHUT_WR)
+            if err != nil {
+              fmt.Printf("shutdown: %v\n", err)
+            }
+            db.rpcCount++
+            go rpcs.ServeConn(conn)
+          } else {
+            db.rpcCount++
+            go rpcs.ServeConn(conn)
+          }
+        } else if err == nil {
+          conn.Close()
+        }
+        if err != nil && db.dead == false {
+          fmt.Printf("MMDatabase(%v) accept: %v\n", me, err.Error())
+        }
+      }
+    }()
   }
-  db.l = l
-
-
-  // please do not change any of the following code,
-  // or do anything to subvert it.
-
-  go db.serveRPC(rpcs)
 
   return db
 }
@@ -476,10 +500,10 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
   var kvh []string = make([]string, nservers)
 
   for i := 0; i < nservers; i++ {
-    kvh[i] = port("basic", i)
+    kvh[i] = Port("basic", i)
   }
   for i := 0; i < nservers; i++ {
-    kva[i] = StartServer(kvh, i)
+    kva[i] = StartServer(kvh, i, nil)
   }
   
   return kva, kvh
@@ -507,5 +531,5 @@ func main() {
   
   fmt.Printf("%v", prefList)
   
-  cleanup(servers)
+  Cleanup(servers)
 }

@@ -11,9 +11,11 @@ type Clerk struct {
 
 
 func MakeClerk(servers []string) *Clerk {
+  fmt.Println("making a clerk")
   ck := new(Clerk)
   ck.servers = servers
-  ck.me = nrand()
+  ck.me = 0
+  fmt.Println("nrand")
   ck.seq = 0
   return ck
 }
