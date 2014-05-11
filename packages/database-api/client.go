@@ -13,7 +13,7 @@ type Clerk struct {
 func MakeClerk(servers []string) *Clerk {
   ck := new(Clerk)
   ck.servers = servers
-  ck.me = 0
+  ck.me = nrand()
   ck.seq = 0
   return ck
 }
