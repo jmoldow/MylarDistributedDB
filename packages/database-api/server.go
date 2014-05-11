@@ -7,11 +7,11 @@ import "log"
 import "sync"
 import "os"
 import "syscall"
-import "math/rand"
 import "time"
 import "hash/fnv"
 import "math/big"
-import "crypto/rand"
+import "math/rand"
+import cryptoRand "crypto/rand"
 
 const (
   OK = "OK"
@@ -261,7 +261,7 @@ API Dispatch Methods
 */
 
 // Serves RPC calls from other database instances
-func serveRPC() {
+func (db *MMDatabase) serveRPC(rpcs *rpc.Server) {
   for db.dead == false {
     conn, err := db.l.Accept()
     if err == nil && db.dead == false {
@@ -284,7 +284,7 @@ func serveRPC() {
       conn.Close()
     }
     if err != nil && db.dead == false {
-      fmt.Printf("MMDatabase(%v) accept: %v\n", me, err.Error())
+      fmt.Printf("MMDatabase(%v) accept: %v\n", db.me, err.Error())
       db.kill()
     }
   }
@@ -308,9 +308,42 @@ func hash(s string) uint32 {
 
 func nrand() int64 {
   max := big.NewInt(int64(1) << 62)
-  bigx, _ := rand.Int(rand.Reader, max)
+  bigx, _ := cryptoRand.Int(cryptoRand.Reader, max)
   x := bigx.Int64()
   return x
+}
+
+//
+// call() sends an RPC to the rpcname handler on server srv
+// with arguments args, waits for the reply, and leaves the
+// reply in reply. the reply argument should be a pointer
+// to a reply structure.
+//
+// the return value is true if the server responded, and false
+// if call() was not able to contact the server. in particular,
+// the reply's contents are only valid if call() returned true.
+//
+// you should assume that call() will time out and return an
+// error after a while if it doesn't get a reply from the server.
+//
+// please use call() to send all RPCs, in client.go and server.go.
+// please don't change this function.
+//
+func call(srv string, rpcname string,
+          args interface{}, reply interface{}) bool {
+  c, errx := rpc.Dial("unix", srv)
+  if errx != nil {
+    return false
+  }
+  defer c.Close()
+    
+  err := c.Call(rpcname, args, reply)
+  if err == nil {
+    return true
+  }
+
+  fmt.Println(err)
+  return false
 }
 
 /*
@@ -320,6 +353,8 @@ Helper Data Types
 */
 
 type Err string
+
+type MessageID int64
 
 type ReplicaPutArgs struct {
   Username string
@@ -367,7 +402,6 @@ func StartServer(servers []string, me int) *MMDatabase {
   db.nServers = len(servers)
   db.nReplicas = 3
   db.handoffMessages = make([]*Message, 0)
-  db.id = nrand()
 
   go db.runHandoffLoop()
 
@@ -385,7 +419,7 @@ func StartServer(servers []string, me int) *MMDatabase {
   // please do not change any of the following code,
   // or do anything to subvert it.
 
-  go serveRPC()
+  go db.serveRPC(rpcs)
 
   return db
 }
