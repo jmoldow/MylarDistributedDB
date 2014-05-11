@@ -1,4 +1,4 @@
-package mmdatabase
+package main
 
 import "net/rpc"
 import "fmt"

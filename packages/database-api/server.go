@@ -1,4 +1,4 @@
-package mmdatabase
+package main
 
 import "net"
 import "fmt"
@@ -9,8 +9,15 @@ import "os"
 import "syscall"
 import "math/rand"
 import "time"
+import "hash/fnv"
+import "math/big"
+import "crypto/rand"
 
-const Debug=0
+const (
+  OK = "OK"
+  ErrWrongCoordinator = "ErrWrongCoordinator"
+  Debug = 0
+)
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
   if Debug > 0 {
@@ -39,6 +46,7 @@ type MMDatabase struct {
 
 type Message struct {
   id MessageID
+  // Whether or not this message needs to be handed off to another node later
   isHandoff bool
   handoffDestination string
   handoffUsername string
@@ -284,6 +292,53 @@ func serveRPC() {
 
 /*
 ****************************************************
+Helper Functions
+****************************************************
+*/
+
+func sameID(id1 RequestID, id2 RequestID) bool {
+  return id1.ClientID == id2.ClientID && id1.Seq == id2.Seq
+}
+
+func hash(s string) uint32 {
+  h := fnv.New32a()
+  h.Write([]byte(s))
+  return h.Sum32()
+}
+
+func nrand() int64 {
+  max := big.NewInt(int64(1) << 62)
+  bigx, _ := rand.Int(rand.Reader, max)
+  x := bigx.Int64()
+  return x
+}
+
+/*
+****************************************************
+Helper Data Types
+****************************************************
+*/
+
+type Err string
+
+type ReplicaPutArgs struct {
+  Username string
+  Msg Message
+  // Whether this ReplicaPut call is satisfying a Handoff (as opposed to being in top nReplicas of priority list)
+  Handoff bool
+}
+
+type ReplicaPutReply struct {
+  Err Err
+}
+
+type RequestID struct {
+  ClientID int64
+  Seq int64
+}
+
+/*
+****************************************************
 Start and Kill Code
 ****************************************************
 */
@@ -312,6 +367,7 @@ func StartServer(servers []string, me int) *MMDatabase {
   db.nServers = len(servers)
   db.nReplicas = 3
   db.handoffMessages = make([]*Message, 0)
+  db.id = nrand()
 
   go db.runHandoffLoop()
 
@@ -332,4 +388,8 @@ func StartServer(servers []string, me int) *MMDatabase {
   go serveRPC()
 
   return db
+}
+
+func main() {
+  fmt.Printf("Test Main\n")
 }
