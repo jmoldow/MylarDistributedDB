@@ -65,7 +65,7 @@ API from Mylar/Meteor
 
 // Returns an ordered slice of servers in order they should be considered as coordinator
 func (db *MMDatabase) GetCoordinatorList(username string) []string {
-  initialIndex := db.GetCoordinatorIndex(username)
+  initialIndex := db.getCoordinatorIndex(username)
   output := make([]string, 0)
   
   for i := initialIndex; i < len(db.servers); i++ {
@@ -82,7 +82,7 @@ func (db *MMDatabase) GetCoordinatorList(username string) []string {
 // Returns success once nReplicas replicas are stored in the system
 func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Message) Err {
   // Assert that this should be coordinator
-  if db.GetCoordinatorIndex(username) != db.me && !message.IsHandoff {
+  if db.getCoordinatorIndex(username) != db.me && !message.IsHandoff {
     return ErrWrongCoordinator
   }
   
@@ -95,7 +95,7 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
     for i, server := range(db.GetCoordinatorList(username)) {
       if !replicaLocations[i] && i != db.me {
         // Set Hinted Handoff
-        handoffTarget := db.GetHandoffTarget(username, i, replicaLocations, handoffTargets)
+        handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
         if handoffTarget == -1 {
           message.IsHandoff = false
         } else {
@@ -195,7 +195,7 @@ API Helpers
 */
 
 // Returns a copy of slice without message at index
-func RemoveMessage(slice []*Message, index int) []*Message {
+func removeMessage(slice []*Message, index int) []*Message {
   maxIndex := len(slice)-1
   
   lastElem := slice[maxIndex]
@@ -205,7 +205,7 @@ func RemoveMessage(slice []*Message, index int) []*Message {
   return slice[:maxIndex]
 }
 
-func (db *MMDatabase) RunHandoffLoop() {
+func (db *MMDatabase) runHandoffLoop() {
   for !db.dead {
     for i, message := range db.handoffMessages {
       // Set up args and reply
@@ -219,7 +219,7 @@ func (db *MMDatabase) RunHandoffLoop() {
       
       if ok && reply.Err == OK {
         // Handoff successful, delete message
-        db.handoffMessages = RemoveMessage(db.handoffMessages, i)
+        db.handoffMessages = removeMessage(db.handoffMessages, i)
         break
       } else {
         time.Sleep(1000*time.Millisecond)
@@ -230,16 +230,16 @@ func (db *MMDatabase) RunHandoffLoop() {
 }
 
 // Returns index of first server that should be chosen as coordinator
-func (db *MMDatabase) GetCoordinatorIndex(username string) int {
-  return int(Hash(username) % uint32(db.nServers))
+func (db *MMDatabase) getCoordinatorIndex(username string) int {
+  return int(hash(username) % uint32(db.nServers))
 }
 
 // Returns what the current handoff target should be with respect to replicaLocations
 // Returns -1 if no handoff
 // Assumes currentIndex is in range [0,nReplicas-1]
-func (db *MMDatabase) GetHandoffTarget(username string, currentIndex int, replicaLocations map[int]bool, handoffTargets map[int]bool) int {
+func (db *MMDatabase) getHandoffTarget(username string, currentIndex int, replicaLocations map[int]bool, handoffTargets map[int]bool) int {
   wrap := false
-  firstReplica := db.GetCoordinatorIndex(username)
+  firstReplica := db.getCoordinatorIndex(username)
   lastReplica := firstReplica + db.nReplicas
   if lastReplica >= db.nServers {
     wrap = true
@@ -276,11 +276,11 @@ Helper Functions
 ****************************************************
 */
 
-func SameID(id1 RequestID, id2 RequestID) bool {
+func sameID(id1 RequestID, id2 RequestID) bool {
   return id1.ClientID == id2.ClientID && id1.Seq == id2.Seq
 }
 
-func Hash(s string) uint32 {
+func hash(s string) uint32 {
   h := fnv.New32a()
   h.Write([]byte(s))
   return h.Sum32()
@@ -293,7 +293,7 @@ func Nrand() int64 {
   return x
 }
 
-func Port(tag string, host int) string {
+func port(tag string, host int) string {
   s := "/var/tmp/824-"
   s += strconv.Itoa(os.Getuid()) + "/"
   os.Mkdir(s, 0777)
@@ -301,11 +301,10 @@ func Port(tag string, host int) string {
   s += strconv.Itoa(os.Getpid()) + "-"
   s += tag + "-"
   s += strconv.Itoa(host)
-  fmt.Println(s)
   return s
 }
 
-func Cleanup(servers []*MMDatabase) {
+func cleanup(servers []*MMDatabase) {
   for i := 0; i < len(servers); i++ {
     if servers[i] != nil {
       servers[i].Kill()
@@ -321,13 +320,13 @@ func Cleanup(servers []*MMDatabase) {
 //
 // the return value is true if the server responded, and false
 // if call() was not able to contact the server. in particular,
-// the replys contents are only valid if call() returned true.
+// the reply's contents are only valid if call() returned true.
 //
 // you should assume that call() will time out and return an
-// error after a while if it does not get a reply from the server.
+// error after a while if it doesn't get a reply from the server.
 //
 // please use call() to send all RPCs, in client.go and server.go.
-// please do not change this function.
+// please don't change this function.
 //
 func call(srv string, name string, args interface{}, reply interface{}) bool {
   c, err := rpc.Dial("unix", srv)
@@ -425,8 +424,6 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
     rpcs = rpc.NewServer()
     rpcs.Register(db)
 
-    go db.RunHandoffLoop()
-
     os.Remove(servers[me])
     l, e := net.Listen("unix", servers[me]);
     if e != nil {
@@ -469,6 +466,8 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
     }()
   }
 
+  go db.runHandoffLoop()
+
   return db
 }
 
@@ -478,7 +477,7 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
   var kvh []string = make([]string, nservers)
 
   for i := 0; i < nservers; i++ {
-    kvh[i] = Port("basic", i)
+    kvh[i] = port("basic", i)
   }
   for i := 0; i < nservers; i++ {
     kva[i] = StartServer(kvh, i, nil)
