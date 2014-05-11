@@ -6,10 +6,7 @@ Package.describe({
 // because it's the same library used as a server in sockjs, and it's easiest to
 // deal with a single websocket implementation.  (Plus, its maintainer is easy
 // to work with on pull requests.)
-Npm.depends({sockjs: "0.3.8", "faye-websocket": "0.7.2",
-
-             ffi: "1.2.6"
-});
+Npm.depends({sockjs: "0.3.8", "faye-websocket": "0.7.2"});
 
 Package.on_use(function (api) {
   api.use('livedata', ['client', 'server']);
@@ -47,18 +44,6 @@ Package.on_use(function (api) {
   api.add_files('mylar_mail_client.js', 'client');
   api.add_files('mylar_mail_server.js', 'server');
   api.add_files('mylar_mail_common.js', ['client', 'server']);
-  var child_process = Npm.require('child_process');
-  var path = Npm.require('path');
-  child_process.exec('pwd', function (error, stdout, stderr) {
-    var projectRoot = stdout.split(/\s/)[0];
-    var packageRoot = path.join(projectRoot, 'packages', 'mylar-mail');
-    var MakefilePath = path.join(packageRoot, 'Makefile');
-    args = ['-f', MakefilePath, '-C', packageRoot];
-    child_process.execFile('make', args, function (error, stdout, stderr) {
-      api.add_files('libfactorial.so', 'server', {isAsset: true});
-      api.add_files('factorial.js', 'server');
-    });
-  });
 
   // we depend on LocalCollection._diffObjects, _applyChanges,
   // _idParse, _idStringify.
