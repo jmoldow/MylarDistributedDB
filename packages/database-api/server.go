@@ -18,6 +18,7 @@ import "encoding/gob"
 const (
   OK = "OK"
   ErrWrongCoordinator = "ErrWrongCoordinator"
+  DNSaddress = "/var/tmp/824-501/dns"
   Debug = 0
 )
 
@@ -45,6 +46,12 @@ type MMDatabase struct {
   nReplicas int // Number of replicas wanted
   handoffMessages []*Message // Messages that need to be handed off
   rpcCount int
+}
+
+type DNSserver struct {
+  l net.Listener
+  me string
+  servers []string
 }
 
 type Message struct {
@@ -184,6 +191,12 @@ func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) e
   if message.IsHandoff {
     db.handoffMessages = append(db.handoffMessages, &message)
   }
+  reply.Err = OK
+  return nil
+}
+
+func (dns *DNSserver) GetServers(args *GetServerArgs, reply *GetServerReply) error {
+  reply.Servers = dns.servers
   reply.Err = OK
   return nil
 }
@@ -471,6 +484,50 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
   return db
 }
 
+func StartDNS(servers []string, rpcs *rpc.Server) *DNSserver {
+  // call gob.Register on structures you want
+  // Go's RPC library to marshall/unmarshall.
+  gob.Register(DNSserver{})
+  gob.Register(GetServerArgs{})
+  gob.Register(GetServerReply{})
+
+  dns := new(DNSserver)
+  dns.servers = servers
+
+  if rpcs != nil {
+    // caller will create socket &c
+    rpcs.Register(dns)
+  } else {
+    rpcs = rpc.NewServer()
+    rpcs.Register(dns)
+
+    os.Remove(DNSaddress)
+    l, e := net.Listen("unix", DNSaddress);
+    if e != nil {
+      log.Fatal("listen error: ", e);
+    }
+    dns.l = l
+    
+    // please do not change any of the following code,
+    // or do anything to subvert it.
+    
+    // create a thread to accept RPC connections
+    go func() {
+      for {
+        conn, err := dns.l.Accept()
+        if err == nil {
+          go rpcs.ServeConn(conn)
+        } 
+        if err != nil {
+          fmt.Printf("DNSerror: %v\n", err.Error())
+        }
+      }
+    }()
+  }
+
+  return dns
+}
+
 // Starts up nservers servers and returns a slice of the objects and a slice of their ports
 func RunServers(nservers int) ([]*MMDatabase, []string) {
   var kva []*MMDatabase = make([]*MMDatabase, nservers)
@@ -519,7 +576,11 @@ func main() {
     
     // Start Servers
     servers, ports := RunServers(nservers)
-    defer Cleanup(servers)
+    defer cleanup(servers)
+    
+    // Start DNS Server
+    dns := StartDNS(ports, nil)
+    fmt.Printf("DNS Info: %v\n", dns.servers)
     
     // Print ports and run until interrupted
     fmt.Printf("Server Ports: %v\n", ports)
@@ -529,8 +590,15 @@ func main() {
     
   // Start Client
   } else if os.Args[1] == "client" {
+    fmt.Println("Getting Servers from DNS")
+    cn := MakeConnector()
+    serverList := cn.GetServerList()
     fmt.Println("Starting Client")
-    // TODO: connect to given server
+    ck := MakeClerk(serverList)
+    
+    // Connection Established, call methods on Clerk
+    prefList := ck.GetCoordinatorList("TestUser")
+    fmt.Printf("Pref List: %v\n", prefList)
     // TODO: issue set of commands
   
   // Error

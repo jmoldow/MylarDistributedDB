@@ -9,6 +9,17 @@ type Clerk struct {
   seq int
 }
 
+type Connector struct {
+  DNS string
+}
+
+type GetServerArgs struct {
+}
+
+type GetServerReply struct {
+  Servers []string
+  Err Err
+}
 
 func MakeClerk(servers []string) *Clerk {
   ck := new(Clerk)
@@ -16,6 +27,23 @@ func MakeClerk(servers []string) *Clerk {
   ck.me = Nrand()
   ck.seq = 0
   return ck
+}
+
+func MakeConnector() *Connector {
+  cn := new(Connector)
+  cn.DNS = DNSaddress
+  return cn
+}
+
+func (cn *Connector) GetServerList() []string {
+  args := new(GetServerArgs)
+  reply := new(GetServerReply)
+  for {
+    ok := call(cn.DNS, "DNSserver.GetServers", args, reply)
+    if ok {
+      return reply.Servers
+    }
+  }
 }
 
 // Gets the Pref List for the username and returns it.  Tries forever until successful
