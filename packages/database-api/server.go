@@ -12,6 +12,8 @@ import "hash/fnv"
 import "math/big"
 import "math/rand"
 import cryptoRand "crypto/rand"
+import "strconv"
+import "encoding/gob"
 
 const (
   OK = "OK"
@@ -131,6 +133,20 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
   replicaLocations[db.me] = true
   
   return OK
+}
+
+/*
+****************************************************
+RPC Wrappers
+****************************************************
+*/
+
+func (db *MMDatabase) HandleGetCoordinatorList(args *GetCoordListArgs, reply *GetCoordListReply) error {
+  fmt.Printf("1\n")
+//  reply.PrefList = db.GetCoordinatorList(args.Username)
+  reply.Err = OK
+  fmt.Printf("2\n")
+  return nil
 }
 
 /*
@@ -313,6 +329,25 @@ func nrand() int64 {
   return x
 }
 
+func port(tag string, host int) string {
+  s := "/var/tmp/824-"
+  s += strconv.Itoa(os.Getuid()) + "/"
+  os.Mkdir(s, 0777)
+  s += "kv-"
+  s += strconv.Itoa(os.Getpid()) + "-"
+  s += tag + "-"
+  s += strconv.Itoa(host)
+  return s
+}
+
+func cleanup(servers []*MMDatabase) {
+  for i := 0; i < len(servers); i++ {
+    if servers[i] != nil {
+      servers[i].kill()
+    }
+  }
+}
+
 //
 // call() sends an RPC to the rpcname handler on server srv
 // with arguments args, waits for the reply, and leaves the
@@ -336,7 +371,7 @@ func call(srv string, rpcname string,
     return false
   }
   defer c.Close()
-    
+  
   err := c.Call(rpcname, args, reply)
   if err == nil {
     return true
@@ -372,6 +407,15 @@ type RequestID struct {
   Seq int64
 }
 
+type GetCoordListArgs struct {
+//  Username string
+}
+
+type GetCoordListReply struct {
+//  PrefList []string
+  Err Err
+}
+
 /*
 ****************************************************
 Start and Kill Code
@@ -394,6 +438,8 @@ func (db *MMDatabase) kill() {
 func StartServer(servers []string, me int) *MMDatabase {
   // call gob.Register on structures you want
   // Go's RPC library to marshall/unmarshall.
+  gob.Register(GetCoordListArgs{})
+  gob.Register(GetCoordListReply{})
 
   db := new(MMDatabase)
   db.dead = false
@@ -424,6 +470,42 @@ func StartServer(servers []string, me int) *MMDatabase {
   return db
 }
 
+// Starts up nservers servers and returns a slice of the objects and a slice of their ports
+func RunServers(nservers int) ([]*MMDatabase, []string) {
+  var kva []*MMDatabase = make([]*MMDatabase, nservers)
+  var kvh []string = make([]string, nservers)
+
+  for i := 0; i < nservers; i++ {
+    kvh[i] = port("basic", i)
+  }
+  for i := 0; i < nservers; i++ {
+    kva[i] = StartServer(kvh, i)
+  }
+  
+  return kva, kvh
+}
+
+/*
+****************************************************
+Main Function
+****************************************************
+*/
+
 func main() {
-  fmt.Printf("Test Main\n")
+  fmt.Printf("Main Start\n")
+  const nservers = 5
+  
+  servers, ports := RunServers(nservers)
+  
+  fmt.Printf("Servers Run\n")
+  
+  ck := MakeClerk(ports)
+  
+  fmt.Printf("Clerk Run\n")
+  
+  prefList := ck.GetCoordinatorList("TestUser")
+  
+  fmt.Printf("%v", prefList)
+  
+  cleanup(servers)
 }
