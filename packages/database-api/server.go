@@ -143,10 +143,8 @@ RPC Wrappers
 */
 
 func (db *MMDatabase) HandleGetCoordinatorList(args *GetCoordListArgs, reply *GetCoordListReply) error {
-  fmt.Printf("1\n")
-//  reply.PrefList = db.GetCoordinatorList(args.Username)
+  reply.PrefList = db.GetCoordinatorList(args.Username)
   reply.Err = OK
-  fmt.Printf("2\n")
   return nil
 }
 
@@ -209,7 +207,6 @@ func RemoveMessage(slice []*Message, index int) []*Message {
 
 func (db *MMDatabase) RunHandoffLoop() {
   for !db.dead {
-    fmt.Printf("RunHandoffLoop %s\n", db.servers[db.me])
     for i, message := range db.handoffMessages {
       // Set up args and reply
       args := new(ReplicaPutArgs)
@@ -290,13 +287,9 @@ func Hash(s string) uint32 {
 }
 
 func Nrand() int64 {
-  fmt.Println("nrand 0")
   max := big.NewInt(int64(1) << 62)
-  fmt.Println("nrand 1")
   bigx, _ := cryptoRand.Int(cryptoRand.Reader, max)
-  fmt.Println("nrand 2")
   x := bigx.Int64()
-  fmt.Println("nrand 3")
   return x
 }
 
@@ -337,37 +330,22 @@ func Cleanup(servers []*MMDatabase) {
 // please do not change this function.
 //
 func call(srv string, name string, args interface{}, reply interface{}) bool {
-  fmt.Println("call")
-  fmt.Println(srv)
-  fmt.Println(name)
-  fmt.Printf("args(%v)\n", args)
-  fmt.Printf("reply(%v)\n", reply)
   c, err := rpc.Dial("unix", srv)
-  fmt.Println("call 1")
   if err != nil {
-    fmt.Println("call 2")
     err1 := err.(*net.OpError)
-    fmt.Println("call 3")
     if err1.Err != syscall.ENOENT && err1.Err != syscall.ECONNREFUSED {
       fmt.Printf("paxos Dial() failed: %v\n", err1)
     }
-    fmt.Println("call 4")
     return false
   }
-  fmt.Println("call 5")
   defer c.Close()
-  fmt.Println("call 6")
     
   err = c.Call(name, args, reply)
-  fmt.Println("call 7")
   if err == nil {
-    fmt.Println("call 8")
     return true
   }
 
-  fmt.Println("call 9")
   fmt.Println(err)
-  fmt.Println("call 10")
   return false
 }
 
@@ -398,11 +376,11 @@ type RequestID struct {
 }
 
 type GetCoordListArgs struct {
-//  Username string
+  Username string
 }
 
 type GetCoordListReply struct {
-//  PrefList []string
+  PrefList []string
   Err Err
 }
 
@@ -516,20 +494,49 @@ Main Function
 */
 
 func main() {
-  fmt.Printf("Main Start\n")
-  const nservers = 5
+  fmt.Println(len(os.Args))
   
-  servers, ports := RunServers(nservers)
+  // Must specify client or server
+  if len(os.Args) < 2 {
+    fmt.Println("You must specify client or server")
+    return
+  }
   
-  fmt.Printf("Servers Run\n")
+  // Start Server
+  if os.Args[1] == "server" {
+    fmt.Println("Starting Servers")
+    // If no extra argument given, default to nservers = 5
+    nservers := 5
+    // If argument given, start that many servers
+    if len(os.Args) > 2 {
+      lenArg := os.Args[2]
+      num, err := strconv.Atoi(lenArg)
+      if err != nil {
+        fmt.Println("Non-Numeric nServers argument")
+        return
+      }
+      nservers = num
+    }
+    
+    // Start Servers
+    servers, ports := RunServers(nservers)
+    defer Cleanup(servers)
+    
+    // Print ports and run until interrupted
+    fmt.Printf("Server Ports: %v\n", ports)
+    for {
+      time.Sleep(1*time.Second)
+    }
+    
+  // Start Client
+  } else if os.Args[1] == "client" {
+    fmt.Println("Starting Client")
+    // TODO: connect to given server
+    // TODO: issue set of commands
   
-  ck := MakeClerk(ports)
-  
-  fmt.Printf("Clerk Run\n")
-  
-  prefList := ck.GetCoordinatorList("TestUser")
-  
-  fmt.Printf("%v", prefList)
-  
-  Cleanup(servers)
+  // Error
+  } else {
+    fmt.Println("Argument passed must be client or server")
+    return
+  }
 }

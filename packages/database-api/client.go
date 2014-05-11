@@ -1,7 +1,7 @@
 package main
 
 import "time"
-import "fmt"
+//import "fmt"
 
 type Clerk struct {
   servers []string
@@ -11,11 +11,9 @@ type Clerk struct {
 
 
 func MakeClerk(servers []string) *Clerk {
-  fmt.Println("making a clerk")
   ck := new(Clerk)
   ck.servers = servers
-  ck.me = 0
-  fmt.Println("nrand")
+  ck.me = Nrand()
   ck.seq = 0
   return ck
 }
@@ -25,14 +23,11 @@ func (ck *Clerk) GetCoordinatorList(username string) []string {
   for {
     args := new(GetCoordListArgs)
     reply := new(GetCoordListReply)
-//    args.Username = username
+    args.Username = username
     for _, server := range ck.servers {
-      fmt.Printf("Call Out\n")
       ok := call(server, "MMDatabase.HandleGetCoordinatorList", args, reply)
-      fmt.Printf("Call Return")
       if ok && reply.Err == OK {
-//        return reply.PrefList
-          return make([]string, 0)
+        return reply.PrefList
       }
       time.Sleep(50*time.Millisecond)
     }
