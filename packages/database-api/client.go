@@ -165,7 +165,7 @@ func (ck *Clerk) HandleRequest() {
       message := new(Message)
       message.Collection = response.Collection
       message.Data = response.Data
-      message.ID = response.Id
+      message.Id = response.Id
       
       ck.CoordinatorPut(response.Username, *message)
       conn.Write([]byte(OK))
@@ -190,5 +190,5 @@ Type string
 Username string
 Collection string
 Data string
-ID string
+Id string
 }

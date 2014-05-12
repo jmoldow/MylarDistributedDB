@@ -295,7 +295,7 @@ func (db *MMDatabase) runHandoffLoop() {
       if ok && reply.Err == OK {
         // Handoff successful, delete message
         db.handoffMessages = removeMessage(db.handoffMessages, i)
-        db.localDelete(message.Id, message.Collection)
+        db.LocalDelete(message.Id, message.Collection)
         break
       } else {
         time.Sleep(1000*time.Millisecond)
