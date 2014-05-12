@@ -40,8 +40,8 @@ Installation
 1. Manually install the mylar library dependencies, the mylar program
    dependencies, and git.
 
-1. Use ```git clone -- https://github.com/jmoldow/MylarMail.git
-   [/path/to/MylarMail]``` to checkout the MylarMail repository.
+1. Use ```git clone -- https://github.com/jmoldow/MylarDistributedDB.git
+   [/path/to/MylarDistributedDB]``` to checkout the MylarDistributedDB repository.
 
 1. Use ```git clone -b <branch-name> -- <repository> [/path/to/mylar]``` to
    checkout the desired mylar repository.
@@ -63,10 +63,10 @@ Installation
 1. Run
    ```
    export PATH=$PATH:/path/to/mylar
-   cd /path/to/MylarMail
+   cd /path/to/MylarDistributedDB
    /path/to/mylar/dev_bundle/bin/node /path/to/mylar/dev_bundle/lib/node_modules/meteorite/bin/mrt.js --get-ready
    ```
-   to have meteorite automatically install MylarMail's meteor package dependencies.
+   to have meteorite automatically install MylarDistributedDB's meteor package dependencies.
 
 Run (Local Development Mode)
 ============================
@@ -79,7 +79,7 @@ Run (Local Development Mode)
 
 1. In another shell, run
    ```
-   cd /path/to/MylarMail
+   cd /path/to/MylarDistributedDB
    /path/to/mylar/meteor --port=4000
    ```
 

@@ -11,4 +11,4 @@ accounts-ui
 principal
 insecure
 livedata
-mylar-mail
+mylar-distributed-db
