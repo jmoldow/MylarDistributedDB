@@ -336,20 +336,16 @@ func Nrand() int64 {
   return x
 }
 
-func port(tag string, host int) string {
-  s := "/var/tmp/824-"
-  s += strconv.Itoa(os.Getuid()) + "/"
+func port(host int) string {
+  s := "/var/tmp/824/"
   os.Mkdir(s, 0777)
-  s += "kv-"
-  s += strconv.Itoa(os.Getpid()) + "-"
-  s += tag + "-"
+  s += "mmdb-"
   s += strconv.Itoa(host)
   return s
 }
 
 func portDNS() string {
-  s := "/var/tmp/824-"
-  s += strconv.Itoa(os.Getuid()) + "/"
+  s := "/var/tmp/824/"
   os.Mkdir(s, 0777)
   s += "dns"
   return s
@@ -601,7 +597,7 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
   var kvh []string = make([]string, nservers)
 
   for i := 0; i < nservers; i++ {
-    kvh[i] = port("basic", i)
+    kvh[i] = port(4000 + 3*i)
   }
   for i := 0; i < nservers; i++ {
     kva[i] = StartServer(kvh, i, nil)
