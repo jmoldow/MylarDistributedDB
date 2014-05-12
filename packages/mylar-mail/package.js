@@ -34,12 +34,16 @@ Package.on_use(function (api) {
 
   api.use('accounts-base', 'server');
 
+  api.use('principal', ['client', 'server']);
+
   // Transport
   api.use('reload', 'client', {weak: true});
   api.add_files('common.js');
   api.add_files('errors.js');
   api.export('CastErrorToCorrectSubclass', ['client', 'server']);
   api.add_files('livedata_connection.js', 'client');
+  api.add_files('collection.js', ['client', 'server']);
+  api.export('wrap_insert', ['client', 'server']);
   api.add_files('accounts_server.js', 'server');
   api.add_files('mylar_mail_client.js', 'client');
   api.add_files('mylar_mail_server.js', 'server');
