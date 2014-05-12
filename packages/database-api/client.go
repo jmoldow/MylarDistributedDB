@@ -9,6 +9,7 @@ type Clerk struct {
   servers []string
   me int64
   seq int
+  port_in string
 }
 
 type Connector struct {
@@ -23,12 +24,32 @@ type GetServerReply struct {
   Err Err
 }
 
-func MakeClerk(servers []string) *Clerk {
+func MakeClerk(servers []string, port_in string) *Clerk {
   ck := new(Clerk)
   ck.servers = servers
   ck.me = Nrand()
   ck.seq = 0
+  ck.port_in = port_in
   return ck
+}
+
+func RunClerks(servers []string) ([]*Clerk, []string) {
+  nservers := len(servers)
+  var kva []*Clerk = make([]*Clerk, nservers)
+  var kvh []string = make([]string, nservers)
+
+  for i := 0; i < nservers; i++ {
+    kvh[i] = portIn(4000 + 3*i)
+  }
+  for i := 0; i < nservers; i++ {
+    kva[i] = MakeClerk(servers, kvh[i])
+    go func(i int) {
+      for {
+        kva[i].HandleRequest()
+      }
+    }(i)
+  }
+  return kva, kvh
 }
 
 func MakeConnector() *Connector {
@@ -114,7 +135,7 @@ func (ck *Clerk) Get(username string, id MessageID) Message {
 }
 
 func (ck *Clerk) HandleRequest() {
-  l, err := net.Listen("unix", InSocket)
+  l, err := net.Listen("unix", ck.port_in)
   if err != nil {
     fmt.Println(err)
     return

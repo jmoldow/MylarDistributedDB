@@ -23,9 +23,6 @@ const (
   GET = "GET"
   LIST = "LIST"
   DELETE = "DELETE"
-  DNSaddress = "/var/tmp/824-501/dns"
-  InSocket = "/tmp/input.sock"
-  OutSocket = "/tmp/output.sock"
   Debug = 0
 )
 
@@ -49,6 +46,7 @@ type MMDatabase struct {
   dead bool // for testing
   unreliable bool // for testing
   servers []string
+  port_meteor string
   nServers int
   nReplicas int // Number of replicas wanted
   handoffMessages []*Message // Messages that need to be handed off
@@ -386,6 +384,22 @@ func portDNS() string {
   return s
 }
 
+func portIn(host int) string {
+  s := "/var/tmp/824/"
+  os.Mkdir(s, 0777)
+  s += "mmdb-in-"
+  s += strconv.Itoa(host)
+  return s
+}
+
+func portMeteor(host int) string {
+  s := "/var/tmp/824/"
+  os.Mkdir(s, 0777)
+  s += "meteor-"
+  s += strconv.Itoa(host)
+  return s
+}
+
 func cleanup(servers []*MMDatabase) {
   for i := 0; i < len(servers); i++ {
     if servers[i] != nil {
@@ -394,8 +408,8 @@ func cleanup(servers []*MMDatabase) {
   }
 }
 
-func setupOutSocket() net.Conn {
-  conn, err := net.Dial("unix", OutSocket)
+func (db *MMDatabase) setupOutSocket() net.Conn {
+  conn, err := net.Dial("unix", db.port_meteor)
   if err != nil {
     fmt.Println("Error Setting Up Output Socket")
     return nil
@@ -516,7 +530,7 @@ func (db *MMDatabase) Kill() {
 // form the fault-tolerant key/value service.
 // me is the index of the current server in servers[].
 // 
-func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
+func StartServer(servers []string, me int, port_meteor string, rpcs *rpc.Server) *MMDatabase {
   // call gob.Register on structures you want
   // Go's RPC library to marshall/unmarshall.
   gob.Register(Message{})
@@ -532,6 +546,7 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
   db := new(MMDatabase)
   db.dead = false
   db.me = me
+  db.port_meteor = port_meteor
   db.servers = servers
   db.nServers = len(servers)
   db.nReplicas = 3
@@ -551,7 +566,7 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
     }
     db.l = l
     
-    db.outputSocket = setupOutSocket()
+    db.outputSocket = db.setupOutSocket()
     
     // please do not change any of the following code,
     // or do anything to subvert it.
@@ -647,7 +662,8 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
     kvh[i] = port(4000 + 3*i)
   }
   for i := 0; i < nservers; i++ {
-    kva[i] = StartServer(kvh, i, nil)
+    port_meteor := portMeteor(4000 + 3*i)
+    kva[i] = StartServer(kvh, i, port_meteor, nil)
   }
   
   return kva, kvh
@@ -704,7 +720,8 @@ func main() {
     cn := MakeConnector()
     serverList := cn.GetServerList()
     fmt.Println("Starting Client")
-    ck := MakeClerk(serverList)
+    _, ports := RunClerks(serverList)
+    fmt.Printf("Client Ports: %v\n", ports)
     
     // Connection Established, call methods on Clerk
 //    prefList := ck.GetCoordinatorList("TestUser")
@@ -714,14 +731,13 @@ func main() {
 //    fmt.Println("Coordinator Put Finished")
 //    ck.Get("TestUser", 0)
 //    fmt.Println("Get Finished")
-
     for {
-      ck.HandleRequest()
+      time.Sleep(1*time.Second)
     }
   
   // Test
   } else if os.Args[1] == "test" {
-    c, err := net.Dial("unix", InSocket)
+    c, err := net.Dial("unix", "/tmp/input.sock")
     
     if err != nil {
       fmt.Println("error!\n")
