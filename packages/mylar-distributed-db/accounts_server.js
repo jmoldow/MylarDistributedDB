@@ -64,7 +64,7 @@ Meteor.methods({
 // If the operation is for a single user, first check if this server is a
 // replica for that user. This is possible to do without any querying, because
 // - single user queries will almost always be by id, username, or email
-// - in MylarMail, a user's _id === username === emails[0].address
+// - a user's _id === username === emails[0].address
 // - the replicas for a user are determined by a hash of the username
 // If this is a replica for the user, perform the query. Otherwise, throw
 // WrongConnectionError.

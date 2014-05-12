@@ -1,7 +1,7 @@
-MylarMail
-=========
+Mylar Distributed DB
+====================
 
-A secure webmail system, built using Mylar, with end-to-end encryption and usable public key infrastructure.
+A secure distributed database, built as a Mylar/Meteor package, with end-to-end encryption and usable public key infrastructure.
 
 Dependencies
 ============

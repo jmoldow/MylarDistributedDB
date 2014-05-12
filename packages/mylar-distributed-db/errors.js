@@ -15,7 +15,7 @@ var WrongConnectionErrorCode = 300;
 // username         {String}
 // userReplicaUrls  {[String]}  Ordered list of replica servers storing the
 //                              data for username. Each must be the URL of
-//                              another MylarMail application that can be passed
+//                              another application that can be passed
 //                              to DDP.connect().
 var WrongConnectionError = Meteor.makeErrorType(
   "Meteor.WrongConnectionError",
