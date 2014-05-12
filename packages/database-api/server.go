@@ -14,11 +14,16 @@ import "math/rand"
 import cryptoRand "crypto/rand"
 import "strconv"
 import "encoding/gob"
+import "encoding/json"
 
 const (
   OK = "OK"
   ErrWrongCoordinator = "ErrWrongCoordinator"
+  PUT = "PUT"
+  GET = "GET"
+  LIST = "LIST"
   DNSaddress = "/var/tmp/824-501/dns"
+  InSocket = "/tmp/input.sock"
   Debug = 0
 )
 
@@ -649,13 +654,42 @@ func main() {
     ck := MakeClerk(serverList)
     
     // Connection Established, call methods on Clerk
-    prefList := ck.GetCoordinatorList("TestUser")
-    fmt.Printf("Pref List: %v\n", prefList)
+//    prefList := ck.GetCoordinatorList("TestUser")
+//    fmt.Printf("Pref List: %v\n", prefList)
     // TODO: issue set of commands
-    ck.CoordinatorPut("TestUser", Message{})
-    fmt.Println("Coordinator Put Finished")
-    ck.Get("TestUser", 0)
-    fmt.Println("Get Finished")
+//    ck.CoordinatorPut("TestUser", Message{})
+//    fmt.Println("Coordinator Put Finished")
+//    ck.Get("TestUser", 0)
+//    fmt.Println("Get Finished")
+
+    for {
+      ck.HandleRequest()
+    }
+  
+  // Test
+  } else if os.Args[1] == "test" {
+    c, err := net.Dial("unix", InSocket)
+    
+    if err != nil {
+      fmt.Println("error!\n")
+    }
+    
+    requestString := `{"Type":"GET", "Username":"TestUser", "Collection":"MyCollection", "Data":"MyData"}`
+    
+    _, err = c.Write([]byte(requestString))  
+    
+    if err != nil {
+      fmt.Println("error!\n")
+    }
+    
+    buffer := make([]byte, 1024)
+    var readlen int
+    readlen, _ = c.Read(buffer)
+    list := buffer[:readlen]
+    answer := new(listreply)
+    json.Unmarshal(list, answer)
+    
+    fmt.Printf("%v\n", answer.List)
   
   // Error
   } else {

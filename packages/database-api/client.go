@@ -1,7 +1,9 @@
 package main
 
 import "time"
-//import "fmt"
+import "fmt"
+import "net"
+import "encoding/json"
 
 type Clerk struct {
   servers []string
@@ -109,4 +111,61 @@ func (ck *Clerk) Get(username string, id MessageID) Message {
     }
     time.Sleep(500*time.Millisecond)
   }
+}
+
+func (ck *Clerk) HandleRequest() {
+  l, err := net.Listen("unix", InSocket)
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  
+  for {
+    conn, err := l.Accept()
+    if err != nil {
+      fmt.Println(err)
+    }
+    
+    buf := make([]byte, 1024)
+    
+    readlen, err := conn.Read(buf)
+    
+    request := string(buf[:readlen])
+    
+    fmt.Println(request)
+    
+    response := new(jsonreply)
+    json.Unmarshal([]byte(request), response)
+    
+    fmt.Println(response)
+    
+    // Handle CoordinatorPut
+    if response.Type == PUT {
+      message := new(Message)
+      message.Collection = response.Collection
+      message.Data = response.Data
+      
+      ck.CoordinatorPut(response.Username, *message)
+      conn.Write([]byte(OK))
+      continue
+    }
+    
+    // Handle GetList
+    output := ck.GetCoordinatorList(response.Username)
+    listresponse := listreply{output}
+    list, _ := json.Marshal(listresponse)
+    
+    conn.Write([]byte(list))
+  }
+}
+
+type listreply struct {
+  List []string
+}
+
+type jsonreply struct {
+Type string
+Username string
+Collection string
+Data string
 }
