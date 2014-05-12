@@ -22,6 +22,7 @@ const (
   PUT = "PUT"
   GET = "GET"
   LIST = "LIST"
+  DELETE = "DELETE"
   DNSaddress = "/var/tmp/824-501/dns"
   InSocket = "/tmp/input.sock"
   OutSocket = "/tmp/output.sock"
@@ -52,6 +53,7 @@ type MMDatabase struct {
   nReplicas int // Number of replicas wanted
   handoffMessages []*Message // Messages that need to be handed off
   rpcCount int
+  outputSocket net.Conn
 }
 
 type DNSserver struct {
@@ -144,7 +146,7 @@ func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
   // Replicate at the N-th server (this one / the coordinator),
   // then return success.
   // TODO: Handoff for coordinator if far down list
-  db.LocalPut(username, message)
+  db.LocalPut(message)
   totalReplicas++
   replicaLocations[db.me] = true
   
@@ -192,14 +194,45 @@ API to Mylar/Meteor
 ****************************************************
 */
 
-func (db *MMDatabase) LocalPut(username string, msg Message) Err {
-  // TODO
+func (db *MMDatabase) LocalPut(msg Message) Err {
+  callout := new(Callout)
+  callout.Method = PUT
+  callout.CollectionName = msg.Collection
+  callout.Document = msg.Data
+  
+  jsonRequest, err := json.Marshal(callout)
+  
+  if err != nil {
+    fmt.Println("Error in LocalPut")
+  }
+  
+  db.outputSocket.Write(jsonRequest)
+  // Ensure Success
   return OK
 }
 
-func (db *MMDatabase) LocalDelete(username string, id MessageID) Err {
-  // TODO
+func (db *MMDatabase) LocalDelete(id MessageID, collection string) Err {
+  callout := new(Callout)
+  callout.Method = DELETE
+  callout.CollectionName = collection
+  callout.ID = id
+  
+  jsonRequest, err := json.Marshal(callout)
+  
+  if err != nil {
+    fmt.Println("Error in LocalPut")
+  }
+  
+  db.outputSocket.Write(jsonRequest)
+  // Ensure Success
   return OK
+}
+
+type Callout struct {
+  Method string
+  CollectionName string
+  Document string
+  ID MessageID
 }
 
 /*
@@ -216,7 +249,7 @@ func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) e
   }
   
   // Do Local Put
-  db.LocalPut(args.Username, message)
+  db.LocalPut(message)
   
   // if message needs to be handed off, store in list of messages that need handing off
   if message.IsHandoff {
@@ -264,6 +297,7 @@ func (db *MMDatabase) runHandoffLoop() {
       if ok && reply.Err == OK {
         // Handoff successful, delete message
         db.handoffMessages = removeMessage(db.handoffMessages, i)
+        db.localDelete(message.Id, message.Collection)
         break
       } else {
         time.Sleep(1000*time.Millisecond)
@@ -358,6 +392,16 @@ func cleanup(servers []*MMDatabase) {
       servers[i].Kill()
     }
   }
+}
+
+func setupOutSocket() net.Conn {
+  conn, err := net.Dial("unix", OutSocket)
+  if err != nil {
+    fmt.Println("Error Setting Up Output Socket")
+    return nil
+  }
+  
+  return conn
 }
 
 //
@@ -506,6 +550,8 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
       log.Fatal("listen error: ", e);
     }
     db.l = l
+    
+    db.outputSocket = setupOutSocket()
     
     // please do not change any of the following code,
     // or do anything to subvert it.
