@@ -24,6 +24,7 @@ const (
   LIST = "LIST"
   DNSaddress = "/var/tmp/824-501/dns"
   InSocket = "/tmp/input.sock"
+  OutSocket = "/tmp/output.sock"
   Debug = 0
 )
 

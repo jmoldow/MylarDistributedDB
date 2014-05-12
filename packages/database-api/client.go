@@ -126,7 +126,7 @@ func (ck *Clerk) HandleRequest() {
       fmt.Println(err)
     }
     
-    buf := make([]byte, 1024)
+    buf := make([]byte, 4096)
     
     readlen, err := conn.Read(buf)
     
@@ -144,6 +144,7 @@ func (ck *Clerk) HandleRequest() {
       message := new(Message)
       message.Collection = response.Collection
       message.Data = response.Data
+      message.ID = response.Id
       
       ck.CoordinatorPut(response.Username, *message)
       conn.Write([]byte(OK))
@@ -168,4 +169,5 @@ Type string
 Username string
 Collection string
 Data string
+ID string
 }
