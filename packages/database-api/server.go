@@ -87,11 +87,11 @@ func (db *MMDatabase) GetCoordinatorList(username string) []string {
 }
 
 // Returns success once nReplicas replicas are stored in the system
-func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Message) Err {
-  // Assert that this should be coordinator
-  if db.getCoordinatorIndex(username) != db.me && !message.IsHandoff {
-    return ErrWrongCoordinator
-  }
+func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
+//   Assert that this should be coordinator
+//  if db.getCoordinatorIndex(username) != db.me && !message.IsHandoff {
+//    return ErrWrongCoordinator
+//  }
   
   totalReplicas := 0
   replicaLocations := make(map[int]bool)
@@ -136,11 +136,17 @@ func (db *MMDatabase) CoordinatorPut(username string, id RequestID, message Mess
   // There should now be (at least) nReplicas-1 replicas in the system.
   // Replicate at the N-th server (this one / the coordinator),
   // then return success.
+  // TODO: Handoff for coordinator if far down list
   db.LocalPut(username, message)
   totalReplicas++
   replicaLocations[db.me] = true
   
   return OK
+}
+
+func (db *MMDatabase) Get(username string, id MessageID) Message {
+  // TODO: find message and return it
+  return Message{}
 }
 
 /*
@@ -151,6 +157,24 @@ RPC Wrappers
 
 func (db *MMDatabase) HandleGetCoordinatorList(args *GetCoordListArgs, reply *GetCoordListReply) error {
   reply.PrefList = db.GetCoordinatorList(args.Username)
+  reply.Err = OK
+  return nil
+}
+
+func (db *MMDatabase) HandleCoordinatorPut(args *CoordPutArgs, reply *CoordPutReply) error {
+  message := new(Message)
+  message.Id = args.ID
+  message.IsHandoff = args.IsHandoff
+  message.Data = args.Data
+  message.Collection = args.Collection
+  
+  reply.Err = db.CoordinatorPut(args.Username, *message)
+  return nil
+}
+
+func (db *MMDatabase) HandleGet(args *GetArgs, reply *GetReply) error {
+  message := db.Get(args.Username, args.ID)
+  reply.Message = message
   reply.Err = OK
   return nil
 }
@@ -396,6 +420,28 @@ type GetCoordListReply struct {
   Err Err
 }
 
+type CoordPutArgs struct {
+  ID MessageID
+  IsHandoff bool
+  Data string
+  Collection string
+  Username string
+}
+
+type CoordPutReply struct {
+  Err Err
+}
+
+type GetArgs struct {
+  Username string
+  ID MessageID
+}
+
+type GetReply struct {
+  Err Err
+  Message Message
+}
+
 /*
 ****************************************************
 Start and Kill Code
@@ -421,6 +467,12 @@ func StartServer(servers []string, me int, rpcs *rpc.Server) *MMDatabase {
   gob.Register(Message{})
   gob.Register(GetCoordListArgs{})
   gob.Register(GetCoordListReply{})
+  gob.Register(ReplicaPutArgs{})
+  gob.Register(ReplicaPutReply{})
+  gob.Register(CoordPutArgs{})
+  gob.Register(CoordPutReply{})
+  gob.Register(GetArgs{})
+  gob.Register(GetReply{})
 
   db := new(MMDatabase)
   db.dead = false
@@ -600,6 +652,10 @@ func main() {
     prefList := ck.GetCoordinatorList("TestUser")
     fmt.Printf("Pref List: %v\n", prefList)
     // TODO: issue set of commands
+    ck.CoordinatorPut("TestUser", Message{})
+    fmt.Println("Coordinator Put Finished")
+    ck.Get("TestUser", 0)
+    fmt.Println("Get Finished")
   
   // Error
   } else {
