@@ -1,5 +1,5 @@
 /*
- * mylar_mail_server.js - Server code for the mylar-mail Meteor package.
+ * socket_server.js - Server code for the distributed database.
  */
 /*
  * This example code creates a sockjs server that listens for incoming network
