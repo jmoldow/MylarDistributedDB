@@ -31,7 +31,7 @@ func MakeClerk(servers []string) *Clerk {
 
 func MakeConnector() *Connector {
   cn := new(Connector)
-  cn.DNS = DNSaddress
+  cn.DNS = portDNS()
   return cn
 }
 

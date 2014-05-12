@@ -18,7 +18,6 @@ import "encoding/gob"
 const (
   OK = "OK"
   ErrWrongCoordinator = "ErrWrongCoordinator"
-  DNSaddress = "/var/tmp/824-501/dns"
   Debug = 0
 )
 
@@ -50,6 +49,7 @@ type MMDatabase struct {
 
 type DNSserver struct {
   l net.Listener
+  address string
   me string
   servers []string
 }
@@ -341,6 +341,14 @@ func port(tag string, host int) string {
   return s
 }
 
+func portDNS() string {
+  s := "/var/tmp/824-"
+  s += strconv.Itoa(os.Getuid()) + "/"
+  os.Mkdir(s, 0777)
+  s += "dns"
+  return s
+}
+
 func cleanup(servers []*MMDatabase) {
   for i := 0; i < len(servers); i++ {
     if servers[i] != nil {
@@ -545,6 +553,7 @@ func StartDNS(servers []string, rpcs *rpc.Server) *DNSserver {
 
   dns := new(DNSserver)
   dns.servers = servers
+  dns.address = portDNS()
 
   if rpcs != nil {
     // caller will create socket &c
@@ -553,8 +562,8 @@ func StartDNS(servers []string, rpcs *rpc.Server) *DNSserver {
     rpcs = rpc.NewServer()
     rpcs.Register(dns)
 
-    os.Remove(DNSaddress)
-    l, e := net.Listen("unix", DNSaddress);
+    os.Remove(dns.address)
+    l, e := net.Listen("unix", dns.address);
     if e != nil {
       log.Fatal("listen error: ", e);
     }
