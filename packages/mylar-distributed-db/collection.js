@@ -5,7 +5,10 @@
  *                 through the distributed database.
  */
 
+Meteor.collections = {};
+
 wrap_insert = function (collection, getUserId, onflict_resolution) {
+  Meteor.collections[collection._name] = collection;
   if (Meteor.isServer) {
     if (!conflict_resolution || !(conflict_resolution instanceof Function)) {
       // Default conflict resolution is to take the object with the latest
@@ -29,6 +32,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
         return localInsert(doc);
       }
     }
+    collection.localRemove = collection.remove;
     collection.remove = function (id/*, callback*/) {
       // We need to keep track of deleted objects. So a remove is actually
       // just overwriting the object with an empty object.

@@ -2,14 +2,29 @@
  * socket_server.js - Server code for the distributed database.
  */
 
+function handleRequest (request) {
+  var method = request.Method;
+  var collectionName = request.CollectionName;
+  var collection = Meteor.collections[collectionName];
+  var doc = request.Document;
+  doc = JSON.parse(doc);
+  var id = request.ID;
+  if (request.Method === "Put") {
+    return collection.localPut(doc);
+  }
+  else if (request.Method === "Delete") {
+    return collection.localRemove(id);
+  }
+}
+
 var net = Npm.require('net');
 var fs = Npm.require('fs');
 var server = net.createServer(function(conn) {
   conn.on('data', function(message) {
     console.log('message:');
     console.log(message.toString());
-    // TODO Handle message. For now, just echo.
-    conn.write(message.toString());
+    conn.write(JSON.stringify(handleRequest(JSON.parse(message.toString()))));
+    conn.close();
   });
   conn.on('close', function() {});
 });
