@@ -197,7 +197,7 @@ func (db *MMDatabase) LocalPut(msg Message) Err {
   callout.Method = PUT
   callout.CollectionName = msg.Collection
   callout.Document = msg.Data
-  
+  callout.ID = msg.Id
   jsonRequest, err := json.Marshal(callout)
   
   if err != nil {
@@ -409,7 +409,7 @@ func cleanup(servers []*MMDatabase) {
 }
 
 func (db *MMDatabase) setupOutSocket() net.Conn {
-  conn, err := net.Dial("unix", db.port_meteor)
+  conn, err := net.Dial("unix", portMeteor(db.me))
   if err != nil {
     fmt.Println("Error Setting Up Output Socket")
     return nil
@@ -669,6 +669,29 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
   return kva, kvh
 }
 
+func EchoServer(num int) {
+  l, err := net.Listen("unix", portMeteor(num))
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  
+  for {
+    conn, err := l.Accept()
+    if err != nil {
+      fmt.Println(err)
+    }
+    
+    buf := make([]byte, 2048)
+    
+    readlen, err := conn.Read(buf)
+    
+    request := string(buf[:readlen])
+    
+    fmt.Printf("%v: %v\n", num, request)
+  }
+}
+
 /*
 ****************************************************
 Main Function
@@ -712,6 +735,16 @@ func main() {
     fmt.Printf("Server Ports: %v\n", ports)
     for {
       time.Sleep(1*time.Second)
+      /*
+      msg := new(Message)
+      msg.Id = 1
+      msg.IsHandoff = false
+      msg.HandoffDestination = ""
+      msg.HandoffUsername = ""
+      msg.Data = "My Data"
+      msg.Collection = "My Collection"
+      servers[0].LocalPut(*msg)
+      */
     }
     
   // Start Client
@@ -737,14 +770,12 @@ func main() {
   
   // Test
   } else if os.Args[1] == "test" {
-    c, err := net.Dial("unix", "/tmp/input.sock")
+    c, err := net.Dial("unix", portIn(4000))
     
     if err != nil {
-      fmt.Println("error!\n")
+      fmt.Println(err)
     }
-    
-    requestString := `{"Type":"GET", "Username":"TestUser", "Collection":"MyCollection", "Data":"MyData"}`
-    
+    requestString := `{"Type":"PUT", "Username":"TestUser", "Collection":"MyCollection", "Data":"MyData", "Id":1}`
     _, err = c.Write([]byte(requestString))  
     
     if err != nil {
@@ -760,6 +791,13 @@ func main() {
     
     fmt.Printf("%v\n", answer.List)
   
+  // Test output command with echo socket
+  } else if os.Args[1] == "out" {
+    go EchoServer(0)
+    go EchoServer(1)
+    go EchoServer(2)
+    go EchoServer(3)
+    EchoServer(4)
   // Error
   } else {
     fmt.Println("Argument passed must be client or server")
