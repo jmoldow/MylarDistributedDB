@@ -21,7 +21,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
     collection._collection.localUpdate = collection._collection.update;
     var localInsert = collection._collection.insert;
     localInsert = Meteor._wrapAsync(Meteor.bindEnvironment(localInsert, Meteor._debug, collection._collection));
-    collection.localPut = Meteor._wrapAsync(function (doc, callback) {
+    collection._collection.localPut = Meteor._wrapAsync(function (doc, callback) {
       console.log(collection._name + ".localPut defined");
       // If an object currently exists, find it, perform conflict
       // resolution, and update the document.
@@ -59,7 +59,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       reply = CoordinatorPut(collection._name, getUserId(doc), doc._id, doc);
       console.log("about to finish collection.insert with " + reply);
       if ("OK" === reply) {
-        return collection.localPut(doc, callback);
+        return collection._collection.localPut(doc, callback);
       }
     });
     console.log(collection._name + ".insert redefined");
