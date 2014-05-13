@@ -58,5 +58,5 @@ CoordinatorPut = function (collectionName, userId, docId, doc) {
     Data: JSON.stringify(doc),
     id: docId
   }
-  sendMessageToDB(request);
+  return sendMessageToDB(request);
 }
