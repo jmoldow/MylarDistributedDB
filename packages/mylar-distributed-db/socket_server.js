@@ -11,7 +11,7 @@ function handleRequest (request) {
   var doc = request.Document;
   var id = request.ID;
   console.log("id: " + id);
-  if (request.Method === "Put") {
+  if (request.Method === "PUT") {
     console.log("handling the following insert");
     console.log(doc);
     try {
@@ -21,7 +21,7 @@ function handleRequest (request) {
     console.log(doc);
     return collection.localPut(doc);
   }
-  else if (request.Method === "Delete") {
+  else if (request.Method === "DELETE") {
     return collection.localRemove(id);
   }
 }
