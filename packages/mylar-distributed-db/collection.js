@@ -17,16 +17,18 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
         return (doc1._ts >= doc2._ts ? doc1 : doc2);
       }
     }
+    collection.localFindOne = collection.findOne;
+    collection.localUpdate = collection.update;
     var localInsert = collection.insert;
     localInsert = Meteor._wrapAsync(Meteor.bindEnvironment(localInsert, Meteor._debug, collection));
     collection.localPut = Meteor._wrapAsync(function (doc, callback) {
       // If an object currently exists, find it, perform conflict
       // resolution, and update the document.
       // Otherwise, insert the new document.
-      var docCurrent = collection.findOne({_id: doc._id});
+      var docCurrent = collection.localFindOne({_id: doc._id});
       if (docCurrent) {
         doc = conflict_resolution(docCurrent, doc);
-        return collection.update(doc._id, doc, function (error) { return callback(error, doc._id); });
+        return collection.localUpdate(doc._id, doc, function (error) { return callback(error, doc._id); });
       }
       else {
         return localInsert(doc, callback);
