@@ -1,41 +1,25 @@
 /*
  * socket_server.js - Server code for the distributed database.
  */
-/*
- * This example code creates a sockjs server that listens for incoming network
- * connections and messages from clients connected to the websocket.
-var http = Npm.require('http');
-var sockjs = Npm.require('sockjs');
-var echo = sockjs.createServer();
-echo.on('connection', function(conn) {
-  conn.on('data', function(message) {
-    console.log('message:');
-    console.log(message);
-    conn.write(message);
-  });
-  conn.on('close', function() {});
-});
 
-var server = http.createServer();
-echo.installHandlers(server, {prefix:'/echo'});
-server.listen(9999, '0.0.0.0');
-*/
-
-// This example code creates a server that listens for incoming connections and
-// messages from clients connected to the Unix file socket.
 var net = Npm.require('net');
 var fs = Npm.require('fs');
 var server = net.createServer(function(conn) {
   conn.on('data', function(message) {
     console.log('message:');
     console.log(message.toString());
+    // TODO Handle message. For now, just echo.
     conn.write(message.toString());
   });
   conn.on('close', function() {});
 });
 
 // File path of the Unix socket that the server should listen to.
-var socketPath = '/tmp/echo.sock';
+var socketPath = '/var/tmp/824/';
+try {
+  fs.mkdirSync(socketPath);
+} catch (e) { }
+socketPath += 'meteor-' + getPort();
 
 // Socket creation and cleanup code from
 // <http://stackoverflow.com/questions/16178239/gracefully-shutdown-unix-socket-server-on-nodejs-running-under-forever/16502680#16502680>
@@ -65,8 +49,8 @@ server.on('error', function(e) {
     // Attempt to talk to the socket as a client. If no error occurs, some
     // other server is running. Close the connection and do nothing else,
     // because recovery is impossible.
-    clientSocket.connect(socketPath, function(conn) {
-      conn.close();
+    clientSocket.connect(socketPath, function() {
+      clientSocket.end();
     });
   }
 });
