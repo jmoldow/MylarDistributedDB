@@ -52,8 +52,7 @@ Meteor.methods({
       userId = this.userId;
     }
     if (userId) {
-      // TODO call GetCoordinatorList(userId)
-      coordinators = ["http://localhost:6000", "http://localhost:5000", "http://localhost:4000", "http://localhost:3000"]; // for testing purposes
+      coordinators = GetCoordinatorList(userId);
       return coordinators
     }
     return [];

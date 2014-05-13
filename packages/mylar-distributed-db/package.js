@@ -43,13 +43,14 @@ Package.on_use(function (api) {
   api.export('getHostFromSocket', ['client', 'server']);
   api.add_files('errors.js');
   api.export('CastErrorToCorrectSubclass', ['client', 'server']);
+  api.add_files('socket_server.js', 'server');
+  api.add_files('socket_client.js', 'server');
+  api.export('sendMessageToDB', 'server');
+  api.export('GetCoordinatorList', 'server');
   api.add_files('livedata_connection.js', 'client');
   api.add_files('collection.js', ['client', 'server']);
   api.export('wrap_insert', ['client', 'server']);
   api.add_files('accounts_server.js', 'server');
-  api.add_files('socket_server.js', 'server');
-  api.add_files('socket_client.js', 'server');
-  api.export('sendMessageToDB', 'server');
 
   // we depend on LocalCollection._diffObjects, _applyChanges,
   // _idParse, _idStringify.

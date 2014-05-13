@@ -7,27 +7,39 @@ var net = Npm.require('net');
 
 var socketPath = '/var/tmp/824/mmdb-in-' + getPort();
 
-sendMessageToDB = function (message, callback) {
-  if (!callback || !(callback instanceof Function)) {
-    callback = function () { };
-  }
-  callback = Meteor.bindEnvironment(callback);
-
+function _sendMessageToDB (message, callback) {
   var clientSocket = new net.Socket();
 
-  clientSocket.on('error', function (e) {
+  clientSocket.on('error', Meteor.bindEnvironment(function (e) {
     clientSocket.end();
-    Meteor.setTimeout(function () {
+    setTimeout(Meteor.bindEnvironment(function () {
       sendMessageToDB(message, callback);
-    }, 2000);
-  });
+    }), 2000);
+  }));
 
-  clientSocket.on('data', function (reply) {
+  clientSocket.on('data', Meteor.bindEnvironment(function (reply) {
     clientSocket.end();
-    callback(JSON.parse(reply));
-  });
+    callback(undefined, JSON.parse(reply.toString()));
+  }));
 
-  clientSocket.connect(socketPath, function() {
+  clientSocket.connect(socketPath, Meteor.bindEnvironment(function() {
     clientSocket.write(JSON.stringify(message));
-  });
+  }));
+};
+_sendMessageToDB = Meteor._wrapAsync(_sendMessageToDB);
+
+sendMessageToDB = function (message) {
+  return _sendMessageToDB(message);
+}
+
+GetCoordinatorList = function (userId) {
+  request = {
+    Type: "LIST",
+    Username: userId,
+    Collection: "",
+    Data: "",
+    id: 0
+  }
+  reply = sendMessageToDB(request).List;
+  return _.map(reply, getHostFromSocket);
 }
