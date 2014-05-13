@@ -28,7 +28,7 @@ var server = net.createServer(function(conn) {
     // reply = {};
     // reply = JSON.stringify(reply);
     // conn.write(reply);
-    conn.close();
+    // conn.close();
   });
   conn.on('close', function() {});
 });

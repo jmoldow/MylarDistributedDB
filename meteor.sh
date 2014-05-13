@@ -1,7 +1,7 @@
 #!/bin/sh
 meteor()
 {
-  xterm -hold -e "cd ../MylarDistributedDB$1 && meteor --port=$1" &
+  xterm -hold -e "cd ../MylarDistributedDB$1 && git fetch origin && git rebase origin/master && meteor --port=$1" &
 }
 
 go()
