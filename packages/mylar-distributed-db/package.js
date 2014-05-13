@@ -38,6 +38,9 @@ Package.on_use(function (api) {
 
   // Transport
   api.use('reload', 'client', {weak: true});
+  api.add_files('port.js', ['client', 'server']);
+  api.export('getPort', ['client', 'server']);
+  api.export('getHostFromSocket', ['client', 'server']);
   api.add_files('errors.js');
   api.export('CastErrorToCorrectSubclass', ['client', 'server']);
   api.add_files('livedata_connection.js', 'client');
