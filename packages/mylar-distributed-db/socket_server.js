@@ -4,15 +4,21 @@
 
 function handleRequest (request) {
   var method = request.Method;
+  console.log("method: " + method);
   var collectionName = request.CollectionName;
+  console.log("collectionName: " + collectionName);
   var collection = Meteor.collections[collectionName];
   var doc = request.Document;
-  console.log(doc);
-  try {
-    doc = JSON.parse(doc);
-  } catch (e) { return; }
   var id = request.ID;
+  console.log("id: " + id);
   if (request.Method === "Put") {
+    console.log("handling the following insert");
+    console.log(doc);
+    try {
+      doc = JSON.parse(doc);
+    } catch (e) { return; }
+    console.log("parsed as");
+    console.log(doc);
     return collection.localPut(doc);
   }
   else if (request.Method === "Delete") {
