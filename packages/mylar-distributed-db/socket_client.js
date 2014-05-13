@@ -22,9 +22,6 @@ function _sendMessageToDB (message, callback) {
     reply = reply.toString();
     console.log("go replied with");
     console.log(reply);
-    try {
-      reply = JSON.parse(reply);
-    } catch (e) { reply = {}; }
     callback(undefined, reply);
   }));
 
