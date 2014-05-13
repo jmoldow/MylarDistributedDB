@@ -35,6 +35,8 @@ sendMessageToDB = function (message) {
   return _sendMessageToDB(message);
 }
 
+nReplicas = 3;
+
 GetCoordinatorList = function (userId) {
   request = {
     Type: "LIST",
@@ -46,7 +48,7 @@ GetCoordinatorList = function (userId) {
   reply = JSON.parse(sendMessageToDB(request)).List;
   console.log("Replica list (unchanged): ");
   console.log(reply);
-  reply = _.map(reply, getHostFromSocket);
+  reply = _.map(reply.slice(0, nReplicas), getHostFromSocket);
   console.log("changed:");
   console.log(reply);
   return reply;

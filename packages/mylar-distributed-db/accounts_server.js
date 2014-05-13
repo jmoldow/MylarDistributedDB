@@ -105,7 +105,9 @@ _.each(["insert", "update", "upsert",
     }
     if (username) {
       coordinators = GetCoordinatorList(username);
-      throw new Meteor.WrongConnectionError(username, coordinators);
+      if (!_.contains(coordinators, Meteor.absoluteUrl())) {
+        throw new Meteor.WrongConnectionError(username, coordinators);
+      }
     }
     return fn.apply(this, arguments);
   }
