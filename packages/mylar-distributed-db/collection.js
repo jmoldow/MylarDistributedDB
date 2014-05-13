@@ -45,7 +45,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
         doc._id = Random.id();
       }
       doc._ts = new Date();
-      // TODO call CoordinatorPut(collection._name, getUserId(doc), doc._id, doc.toString())
+      CoordinatorPut(collection._name, getUserId(doc), doc._id, doc);
     }
   }
   else if (Meteor.isClient) {

@@ -43,3 +43,14 @@ GetCoordinatorList = function (userId) {
   reply = sendMessageToDB(request).List;
   return _.map(reply, getHostFromSocket);
 }
+
+CoordinatorPut = function (collectionName, userId, docId, doc) {
+  request = {
+    Type: "PUT",
+    Username: userId,
+    Collection: collectionName,
+    Data: JSON.stringify(doc),
+    id: docId
+  }
+  sendMessageToDB(request);
+}
