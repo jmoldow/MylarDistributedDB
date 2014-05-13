@@ -19,26 +19,26 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
     }
     var localInsert = collection.insert;
     localInsert = Meteor.bindEnvironment(localInsert, Meteor._debug, collection);
-    collection.localPut = function (doc/*, callback*/) {
+    collection.localPut = function (doc, callback) {
       // If an object currently exists, find it, perform conflict
       // resolution, and update the document.
       // Otherwise, insert the new document.
       var docCurrent = collection.findOne({_id: doc._id});
       if (docCurrent) {
         doc = conflict_resolution(docCurrent, doc);
-        return collection.update(doc._id, doc);
+        return collection.update(doc._id, doc, callback);
       }
       else {
-        return localInsert(doc);
+        return localInsert(doc, callback);
       }
     }
     collection.localRemove = collection.remove;
-    collection.remove = function (id/*, callback*/) {
+    collection.remove = function (id, callback) {
       // We need to keep track of deleted objects. So a remove is actually
       // just overwriting the object with an empty object.
-      return collection.insert({_id: _id});
+      return collection.insert({_id: _id}, callback);
     }
-    collection.insert = function (doc/*, callback*/) {
+    collection.insert = function (doc, callback) {
       // The server method that gets called by the client. Instead of
       // inserting directly into MongoDB, call out to the distributed
       // database. But first, give the object an _id (so that all replicas
@@ -49,7 +49,9 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
         doc._id = Random.id();
       }
       doc._ts = new Date();
-      CoordinatorPut(collection._name, getUserId(doc), doc._id, doc);
+      if ("OK" === CoordinatorPut(collection._name, getUserId(doc), doc._id, doc)) {
+        return collection.localPut(doc, callback);
+      }
     }
   }
   else if (Meteor.isClient) {

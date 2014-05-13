@@ -141,18 +141,10 @@ func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
   }
   
   // There should now be (at least) nReplicas-1 replicas in the system.
-  // Replicate at the N-th server (this one / the coordinator),
-  // then return success.
+  // Return success; the Meteor application will replicate
+  // at the N-th server (this one / the coordinator).
   // TODO: Handoff for coordinator if far down list
-  for {
-    ok := db.LocalPut(message)
-    if ok == OK {
-      totalReplicas++
-      replicaLocations[db.me] = true 
-      return OK
-    }
-    time.Sleep(800*time.Millisecond)
-  }
+  return OK
 }
 
 func (db *MMDatabase) Get(username string, id MessageID) Message {
