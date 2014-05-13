@@ -19,10 +19,10 @@ function handleRequest (request) {
     } catch (e) { return; }
     console.log("parsed as");
     console.log(doc);
-    return collection.localPut(doc);
+    return collection._collection.localPut(doc);
   }
   else if (request.Method === "DELETE") {
-    return collection.localRemove(id);
+    return collection._collection.localRemove(id);
   }
 }
 
