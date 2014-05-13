@@ -409,7 +409,7 @@ func cleanup(servers []*MMDatabase) {
 }
 
 func (db *MMDatabase) setupOutSocket() net.Conn {
-  conn, err := net.Dial("unix", portMeteor(db.me))
+  conn, err := net.Dial("unix", db.port_meteor)
   if err != nil {
     fmt.Println(err)
     return nil
