@@ -133,7 +133,7 @@ func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
         }
       }
       
-      if totalReplicas >=  db.nReplicas {
+      if totalReplicas >=  db.nReplicas-1 {
         break
       }
       
