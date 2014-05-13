@@ -61,10 +61,10 @@ Installation
 Run (Local Development Mode)
 ============================
 
-1. In a shell, run
-   ```
-   cd /path/to/MylarDistributedDB
-   ./meteor.sh
-   ```
-   This starts one IDP server, five MylarDistributedDB servers, the Go servers,
-   and the Go clients.
+In a shell, run
+```
+cd /path/to/MylarDistributedDB
+./meteor.sh
+```
+This starts one IDP server, five MylarDistributedDB servers, the Go servers,
+and the Go clients.
