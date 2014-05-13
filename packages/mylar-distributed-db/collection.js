@@ -18,9 +18,9 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       }
     }
     collection.localFindOne = collection.findOne;
-    collection.localUpdate = collection.update;
-    var localInsert = collection.insert;
-    localInsert = Meteor._wrapAsync(Meteor.bindEnvironment(localInsert, Meteor._debug, collection));
+    collection._collection.localUpdate = collection._collection.update;
+    var localInsert = collection._collection.insert;
+    localInsert = Meteor._wrapAsync(Meteor.bindEnvironment(localInsert, Meteor._debug, collection._collection));
     collection.localPut = Meteor._wrapAsync(function (doc, callback) {
       console.log(collection._name + ".localPut defined");
       // If an object currently exists, find it, perform conflict
@@ -29,22 +29,22 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       var docCurrent = collection.localFindOne({_id: doc._id});
       if (docCurrent) {
         doc = conflict_resolution(docCurrent, doc);
-        return collection.localUpdate(doc._id, doc, function (error) { return callback(error, doc._id); });
+        return collection._collection.localUpdate(doc._id, doc, function (error) { return callback(error, doc._id); });
       }
       else {
         return localInsert(doc, callback);
       }
     });
     console.log(collection._name + ".localPut defined");
-    collection.localRemove = collection.remove;
-    collection.remove = Meteor._wrapAsync(function (id, callback) {
+    collection._collection.localRemove = collection._collection.remove;
+    collection._collection.remove = Meteor._wrapAsync(function (id, callback) {
       console.log(collection._name + ".remove redefined");
       // We need to keep track of deleted objects. So a remove is actually
       // just overwriting the object with an empty object.
-      return collection.insert({_id: id}, function (error) { return callback(error, 1); });
+      return collection._collection.insert({_id: id}, function (error) { return callback(error, 1); });
     });
     console.log(collection._name + ".remove redefined");
-    collection.insert = Meteor._wrapAsync(function (doc, callback) {
+    collection._collection.insert = Meteor._wrapAsync(function (doc, callback._collection) {
       console.log(collection._name + ".insert redefined");
       // The server method that gets called by the client. Instead of
       // inserting directly into MongoDB, call out to the distributed
