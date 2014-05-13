@@ -28,8 +28,8 @@ function handleRequest (request) {
 
 var net = Npm.require('net');
 var fs = Npm.require('fs');
-var server = net.createServer(function(conn) {
-  conn.on('data', function(message) {
+var server = net.createServer(Meteor.bindEnvironment(function(conn) {
+  conn.on('data', Meteor.bindEnvironment(function(message) {
     console.log('message:');
     console.log(message.toString());
     message = JSON.parse(message.toString());
@@ -38,9 +38,8 @@ var server = net.createServer(function(conn) {
     // reply = JSON.stringify(reply);
     // conn.write(reply);
     // conn.close();
-  });
-  conn.on('close', function() {});
-});
+  }));
+}));
 
 // File path of the Unix socket that the server should listen to.
 var socketPath = '/var/tmp/824/';
@@ -51,7 +50,7 @@ socketPath += 'meteor-' + getPort();
 
 // Socket creation and cleanup code from
 // <http://stackoverflow.com/questions/16178239/gracefully-shutdown-unix-socket-server-on-nodejs-running-under-forever/16502680#16502680>
-server.on('error', function(e) {
+server.on('error', Meteor.bindEnvironment(function(e) {
 
   // If the server encounters an EADDRINUSE error when it starts to listen
   // to the socket, then one of two situations has occurred.  Either the
@@ -67,21 +66,21 @@ server.on('error', function(e) {
     // Handle error trying to talk to socket.  If the error is ECONNREFUSED,
     // no other server is listening, so the server can safely recover by
     // unlinking the socket and trying again.
-    clientSocket.on('error', function(e) {
+    clientSocket.on('error', Meteor.bindEnvironment(function(e) {
       if (e.code == 'ECONNREFUSED') {
         fs.unlinkSync(socketPath);
         server.listen(socketPath);
       }
-    });
+    }));
 
     // Attempt to talk to the socket as a client. If no error occurs, some
     // other server is running. Close the connection and do nothing else,
     // because recovery is impossible.
-    clientSocket.connect(socketPath, function() {
+    clientSocket.connect(socketPath, Meteor.bindEnvironment(function() {
       clientSocket.end();
-    });
+    }));
   }
-});
+}));
 
 server.listen(socketPath);
 
