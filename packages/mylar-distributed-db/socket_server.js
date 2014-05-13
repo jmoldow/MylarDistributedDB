@@ -7,7 +7,10 @@ function handleRequest (request) {
   var collectionName = request.CollectionName;
   var collection = Meteor.collections[collectionName];
   var doc = request.Document;
-  doc = JSON.parse(doc);
+  console.log(doc);
+  try {
+    doc = JSON.parse(doc);
+  } catch (e) { return; }
   var id = request.ID;
   if (request.Method === "Put") {
     return collection.localPut(doc);
