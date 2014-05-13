@@ -107,7 +107,7 @@ func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
   // Send to all N replicas except for this one (the coordinator)
   for totalReplicas < db.nReplicas-1 {
     for i, server := range(db.GetCoordinatorList(username)) {
-      if !replicaLocations[i] && i != db.me {
+      if !replicaLocations[i] && server != db.servers[db.me] {
         // Set Hinted Handoff
         handoffTarget := db.getHandoffTarget(username, i, replicaLocations, handoffTargets)
         if handoffTarget == -1 {

@@ -18,27 +18,27 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       }
     }
     var localInsert = collection.insert;
-    localInsert = Meteor.bindEnvironment(localInsert, Meteor._debug, collection);
-    collection.localPut = function (doc, callback) {
+    localInsert = Meteor._wrapAsync(Meteor.bindEnvironment(localInsert, Meteor._debug, collection));
+    collection.localPut = Meteor._wrapAsync(function (doc, callback) {
       // If an object currently exists, find it, perform conflict
       // resolution, and update the document.
       // Otherwise, insert the new document.
       var docCurrent = collection.findOne({_id: doc._id});
       if (docCurrent) {
         doc = conflict_resolution(docCurrent, doc);
-        return collection.update(doc._id, doc, callback);
+        return collection.update(doc._id, doc, function (error) { return callback(error, doc._id); });
       }
       else {
         return localInsert(doc, callback);
       }
-    }
+    });
     collection.localRemove = collection.remove;
-    collection.remove = function (id, callback) {
+    collection.remove = Meteor._wrapAsync(function (id, callback) {
       // We need to keep track of deleted objects. So a remove is actually
       // just overwriting the object with an empty object.
-      return collection.insert({_id: _id}, callback);
-    }
-    collection.insert = function (doc, callback) {
+      return collection.insert({_id: id}, function (error) { return callback(error, 1); });
+    });
+    collection.insert = Meteor._wrapAsync(function (doc, callback) {
       // The server method that gets called by the client. Instead of
       // inserting directly into MongoDB, call out to the distributed
       // database. But first, give the object an _id (so that all replicas
@@ -54,7 +54,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       if ("OK" === reply) {
         return collection.localPut(doc, callback);
       }
-    }
+    });
   }
   else if (Meteor.isClient) {
     _.each(["update", "upsert"], function (name) {
