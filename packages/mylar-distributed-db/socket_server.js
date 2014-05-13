@@ -23,7 +23,11 @@ var server = net.createServer(function(conn) {
   conn.on('data', function(message) {
     console.log('message:');
     console.log(message.toString());
-    conn.write(JSON.stringify(handleRequest(JSON.parse(message.toString()))));
+    message = JSON.parse(message.toString());
+    handleRequest(message);
+    // reply = {};
+    // reply = JSON.stringify(reply);
+    // conn.write(reply);
     conn.close();
   });
   conn.on('close', function() {});
