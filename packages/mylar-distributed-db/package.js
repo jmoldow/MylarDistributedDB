@@ -49,6 +49,7 @@ Package.on_use(function (api) {
   api.export('GetCoordinatorList', 'server');
   api.export('CoordinatorPut', 'server');
   api.add_files('livedata_connection.js', 'client');
+  api.export('getUserReplicaUrls', 'client');
   api.add_files('collection.js', ['client', 'server']);
   api.export('wrap_insert', ['client', 'server']);
   api.add_files('accounts_server.js', 'server');

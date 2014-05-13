@@ -130,3 +130,13 @@ Deps.autorun(function () {
     }
   });
 });
+
+var _getUserReplicaUrls = function (userId, callback) {
+  Meteor.apply('getUserReplicaUrls', [userId], callback);
+}
+
+_getUserReplicaUrls = Meteor._wrapAsync(_getUserReplicaUrls);
+
+getUserReplicaUrls = function (userId) {
+  return _getUserReplicaUrls(userId);
+}
