@@ -12,6 +12,7 @@ Dependencies
     - meteor fork version: v0.8.1.1
     - Website: <https://github.com/jmoldow/mylar>
   - <git://g.csail.mit.edu/mylar>@public branch
+    - NOTE: untested
     - meteor fork version: v0.6.6.3
     - Website: <https://css.csail.mit.edu/mylar/>
 - mylar library dependencies:
@@ -30,9 +31,6 @@ Dependencies
   - mime
     - a Node mime-type mapping library
     - Website: <https://www.npmjs.org/package/mime>
-- meteorite
-  - a meteor package manager
-  - Website: <https://www.npmjs.org/package/meteorite>
 
 Installation
 ============
@@ -56,30 +54,17 @@ Installation
 1. Run
    ```
    cd /path/to/mylar/dev_bundle/lib/node_modules
-   ../../bin/npm install mime meteorite
+   ../../bin/npm install mime
    ```
-   to install mime and meteorite.
-
-1. Run
-   ```
-   export PATH=$PATH:/path/to/mylar
-   cd /path/to/MylarDistributedDB
-   /path/to/mylar/dev_bundle/bin/node /path/to/mylar/dev_bundle/lib/node_modules/meteorite/bin/mrt.js --get-ready
-   ```
-   to have meteorite automatically install MylarDistributedDB's meteor package dependencies.
+   to install mime.
 
 Run (Local Development Mode)
 ============================
 
-1. In one shell, run
-   ```
-   cd /path/to/mylar/enc_modules/idp-email
-   /path/to/mylar/meteor --port=3000
-   ```
-
-1. In another shell, run
+1. In a shell, run
    ```
    cd /path/to/MylarDistributedDB
-   /path/to/mylar/meteor --port=4000
+   ./meteor.sh
    ```
-
+   This starts one IDP server, five MylarDistributedDB servers, the Go servers,
+   and the Go clients.
