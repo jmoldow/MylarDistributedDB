@@ -8,7 +8,7 @@ import "os"
 
 type Clerk struct {
   servers []string
-  me int64
+  me int
   seq int
   port_in string
 }
@@ -25,10 +25,10 @@ type GetServerReply struct {
   Err Err
 }
 
-func MakeClerk(servers []string, port_in string) *Clerk {
+func MakeClerk(servers []string, me int, port_in string) *Clerk {
   ck := new(Clerk)
   ck.servers = servers
-  ck.me = Nrand()
+  ck.me = me
   ck.seq = 0
   ck.port_in = port_in
   return ck
@@ -43,7 +43,7 @@ func RunClerks(servers []string) ([]*Clerk, []string) {
     kvh[i] = portIn(4000 + 3*i)
   }
   for i := 0; i < nservers; i++ {
-    kva[i] = MakeClerk(servers, kvh[i])
+    kva[i] = MakeClerk(servers, i, kvh[i])
     go func(i int) {
       for {
         kva[i].HandleRequest()
@@ -75,6 +75,10 @@ func (ck *Clerk) GetCoordinatorList(username string) []string {
   args := new(GetCoordListArgs)
   reply := new(GetCoordListReply)
   args.Username = username
+  ok := call(ck.servers[ck.me], "MMDatabase.HandleGetCoordinatorList", args, reply)
+  if ok && reply.Err == OK {
+    return reply.PrefList
+  }
   for {
     for _, server := range ck.servers {
       ok := call(server, "MMDatabase.HandleGetCoordinatorList", args, reply)
@@ -100,6 +104,18 @@ func (ck *Clerk) CoordinatorPut(username string, message Message) {
   prefList := ck.GetCoordinatorList(username)
   
   for {
+    for _, server := range prefList {
+      if server != ck.servers[ck.me] {
+        continue
+      }
+      ok := call(server, "MMDatabase.HandleCoordinatorPut", args, reply)
+      if ok {
+        if reply.Err == OK {
+          return
+        }
+      }
+      time.Sleep(50*time.Millisecond)
+    }
     for _, server := range prefList {
       ok := call(server, "MMDatabase.HandleCoordinatorPut", args, reply)
       if ok {
