@@ -44,7 +44,7 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
       return collection._collection.insert({_id: id}, function (error) { return callback(error, 1); });
     });
     console.log(collection._name + ".remove redefined");
-    collection._collection.insert = Meteor._wrapAsync(function (doc, callback._collection) {
+    collection._collection.insert = Meteor._wrapAsync(function (doc, callback) {
       console.log(collection._name + ".insert redefined");
       // The server method that gets called by the client. Instead of
       // inserting directly into MongoDB, call out to the distributed
