@@ -104,9 +104,8 @@ _.each(["insert", "update", "upsert",
       }
     }
     if (username) {
-      // TODO call GetCoordinatorList(username)
-      // coordinators = ["http://localhost:6000", "http://localhost:5000", "http://localhost:4000", "http://localhost:3000"]; // for testing purposes
-      // throw new Meteor.WrongConnectionError(username, coordinators);
+      coordinators = GetCoordinatorList(username);
+      throw new Meteor.WrongConnectionError(username, coordinators);
     }
     return fn.apply(this, arguments);
   }

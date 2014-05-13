@@ -44,7 +44,12 @@ GetCoordinatorList = function (userId) {
     id: 0
   }
   reply = sendMessageToDB(request).List;
-  return _.map(reply, getHostFromSocket);
+  console.log("Replica list (unchanged): ");
+  console.log(reply);
+  reply = _.map(reply, getHostFromSocket);
+  console.log("changed:");
+  console.log(reply);
+  return reply;
 }
 
 CoordinatorPut = function (collectionName, userId, docId, doc) {
