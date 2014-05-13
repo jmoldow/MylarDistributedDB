@@ -19,6 +19,7 @@ import "encoding/json"
 const (
   OK = "OK"
   ErrWrongCoordinator = "ErrWrongCoordinator"
+  ErrMeteorSocket = "ErrMeteorSocket"
   PUT = "PUT"
   GET = "GET"
   LIST = "LIST"
@@ -51,7 +52,6 @@ type MMDatabase struct {
   nReplicas int // Number of replicas wanted
   handoffMessages []*Message // Messages that need to be handed off
   rpcCount int
-  outputSocket net.Conn
 }
 
 type DNSserver struct {
@@ -144,11 +144,15 @@ func (db *MMDatabase) CoordinatorPut(username string, message Message) Err {
   // Replicate at the N-th server (this one / the coordinator),
   // then return success.
   // TODO: Handoff for coordinator if far down list
-  db.LocalPut(message)
-  totalReplicas++
-  replicaLocations[db.me] = true
-  
-  return OK
+  for {
+    ok := db.LocalPut(message)
+    if ok == OK {
+      totalReplicas++
+      replicaLocations[db.me] = true 
+      return OK
+    }
+    time.Sleep(800*time.Millisecond)
+  }
 }
 
 func (db *MMDatabase) Get(username string, id MessageID) Message {
@@ -204,8 +208,15 @@ func (db *MMDatabase) LocalPut(msg Message) Err {
     fmt.Println("Error in LocalPut")
   }
   
-  db.outputSocket.Write(jsonRequest)
+  outputSocket := db.setupOutSocket()
+  if outputSocket == nil {
+    fmt.Println("Failed Meteor Socket")
+    return ErrMeteorSocket
+  }
+  
+  outputSocket.Write(jsonRequest)
   // Ensure Success
+  outputSocket.Close()
   return OK
 }
 
@@ -221,8 +232,15 @@ func (db *MMDatabase) LocalDelete(id MessageID, collection string) Err {
     fmt.Println("Error in LocalPut")
   }
   
-  db.outputSocket.Write(jsonRequest)
+  outputSocket := db.setupOutSocket()
+  if outputSocket == nil {
+    fmt.Println("Failed Meteor Socket")
+    return ErrMeteorSocket
+  }
+  
+  outputSocket.Write(jsonRequest)
   // Ensure Success
+  outputSocket.Close()
   return OK
 }
 
@@ -247,14 +265,18 @@ func (db *MMDatabase) ReplicaPut(args *ReplicaPutArgs, reply *ReplicaPutReply) e
   }
   
   // Do Local Put
-  db.LocalPut(message)
-  
-  // if message needs to be handed off, store in list of messages that need handing off
-  if message.IsHandoff {
-    db.handoffMessages = append(db.handoffMessages, &message)
+  for {
+    ok := db.LocalPut(message)
+    if ok == OK {
+      // if message needs to be handed off, store in list of messages that need handing off
+      if message.IsHandoff {
+        db.handoffMessages = append(db.handoffMessages, &message)
+      }
+      reply.Err = OK
+      return nil
+    }
+    time.Sleep(800*time.Millisecond)
   }
-  reply.Err = OK
-  return nil
 }
 
 func (dns *DNSserver) GetServers(args *GetServerArgs, reply *GetServerReply) error {
@@ -295,7 +317,13 @@ func (db *MMDatabase) runHandoffLoop() {
       if ok && reply.Err == OK {
         // Handoff successful, delete message
         db.handoffMessages = removeMessage(db.handoffMessages, i)
-        db.LocalDelete(message.Id, message.Collection)
+        for {
+          deleted := db.LocalDelete(message.Id, message.Collection)
+          if deleted == OK {
+            break
+          }
+          time.Sleep(800*time.Millisecond)
+        }
         break
       } else {
         time.Sleep(1000*time.Millisecond)
@@ -565,8 +593,6 @@ func StartServer(servers []string, me int, port_meteor string, rpcs *rpc.Server)
       log.Fatal("listen error: ", e);
     }
     db.l = l
-    
-    db.outputSocket = db.setupOutSocket()
     
     // please do not change any of the following code,
     // or do anything to subvert it.
