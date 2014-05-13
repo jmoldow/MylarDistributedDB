@@ -110,6 +110,7 @@ Meteor.connection._stream.on('disconnect', function () {
 // When the client is loaded, Meteor.userReplicaUrls is computed based on
 // the current user. And since Meteor.userId() is reactive, it is recomputed
 // whenever the current user changes.
+/*
 Deps.autorun(function () {
   Meteor.apply('getUserReplicaUrls',
                [Meteor.userId()],
@@ -129,7 +130,7 @@ Deps.autorun(function () {
       }
     }
   });
-});
+});*/
 
 var _getUserReplicaUrls = function (userId, callback) {
   Meteor.apply('getUserReplicaUrls', [userId], callback);
