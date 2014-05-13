@@ -49,7 +49,9 @@ wrap_insert = function (collection, getUserId, onflict_resolution) {
         doc._id = Random.id();
       }
       doc._ts = new Date();
-      if ("OK" === CoordinatorPut(collection._name, getUserId(doc), doc._id, doc)) {
+      reply = CoordinatorPut(collection._name, getUserId(doc), doc._id, doc);
+      console.log("about to finish collection.insert with " + reply);
+      if ("OK" === reply) {
         return collection.localPut(doc, callback);
       }
     }
