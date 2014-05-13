@@ -19,7 +19,13 @@ function _sendMessageToDB (message, callback) {
 
   clientSocket.on('data', Meteor.bindEnvironment(function (reply) {
     clientSocket.end();
-    callback(undefined, JSON.parse(reply.toString()));
+    reply = reply.toString();
+    console.log("go replied with");
+    console.log(reply);
+    try {
+      reply = JSON.parse(reply);
+    } catch (e) { reply = {}; }
+    callback(undefined, reply);
   }));
 
   clientSocket.connect(socketPath, Meteor.bindEnvironment(function() {
