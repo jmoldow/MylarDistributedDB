@@ -411,7 +411,7 @@ func cleanup(servers []*MMDatabase) {
 func (db *MMDatabase) setupOutSocket() net.Conn {
   conn, err := net.Dial("unix", portMeteor(db.me))
   if err != nil {
-    fmt.Println("Error Setting Up Output Socket")
+    fmt.Println(err)
     return nil
   }
   
@@ -670,6 +670,7 @@ func RunServers(nservers int) ([]*MMDatabase, []string) {
 }
 
 func EchoServer(num int) {
+  os.Remove(portMeteor(num))
   l, err := net.Listen("unix", portMeteor(num))
   if err != nil {
     fmt.Println(err)

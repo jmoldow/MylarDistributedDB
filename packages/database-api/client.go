@@ -4,6 +4,7 @@ import "time"
 import "fmt"
 import "net"
 import "encoding/json"
+import "os"
 
 type Clerk struct {
   servers []string
@@ -135,6 +136,7 @@ func (ck *Clerk) Get(username string, id MessageID) Message {
 }
 
 func (ck *Clerk) HandleRequest() {
+  os.Remove(ck.port_in)
   l, err := net.Listen("unix", ck.port_in)
   if err != nil {
     fmt.Println(err)
