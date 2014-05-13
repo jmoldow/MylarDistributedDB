@@ -43,7 +43,7 @@ GetCoordinatorList = function (userId) {
     Data: "",
     id: 0
   }
-  reply = sendMessageToDB(request).List;
+  reply = JSON.parse(sendMessageToDB(request)).List;
   console.log("Replica list (unchanged): ");
   console.log(reply);
   reply = _.map(reply, getHostFromSocket);
